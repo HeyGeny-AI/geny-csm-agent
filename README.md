@@ -59,7 +59,6 @@ Together, Gemini and Pipecat enable Geny to act as a **fully autonomous voice re
 | Tool | Role |
 |------|------|
 | **Model Context Protocol (MCP)** | Bridges Gemini’s function calls with backend booking logic (implemented via a NestJS MCP server). |
-| **Langfuse** | Logs and visualizes voice interaction traces for debugging and evaluation. |
 | **Twilio (Pipecat Transports)** | Enables live call and browser voice connections. |
 | **ElevenLabs** | Provides the branded “Geny” voice for consistent identity. |
 | **FastAPI / Python 3.9** | Powers the conversational layer and MCP client. |

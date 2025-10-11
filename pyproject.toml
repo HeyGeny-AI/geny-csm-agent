@@ -4,8 +4,13 @@ version = "0.1.0"
 description = "Gemini Live + Twilio example for building voice AI bots with Pipecat"
 requires-python = ">=3.10"
 dependencies = [
+    "aiohttp>=3.13.0",
+    "loguru>=0.7.3",
+    "mcp",
     "pipecat-ai[webrtc,websocket,silero,google,local-smart-turn-v3,runner]>=0.0.90",
-    "pipecatcloud>=0.2.6"
+    "pipecatcloud>=0.2.6",
+    "python-dotenv>=1.1.1",
+    "pytz>=2025.2",
 ]
 
 [dependency-groups]
@@ -17,3 +22,6 @@ dev = [
 line-length = 100
 [tool.ruff.lint]
 select = ["I"]
+
+[tool.uv.sources]
+mcp = { git = "https://github.com/modelcontextprotocol/python-sdk.git" }

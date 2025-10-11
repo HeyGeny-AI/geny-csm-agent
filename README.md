@@ -1,197 +1,251 @@
-# Gemini Phone Bots
+# Conversational Booking Bot with MCP Protocol
 
-A telephone-based conversational agent built with Pipecat, powered by Google's Gemini APIs and Twilio. This bot plays "Two Truths and a Lie". The bot will provide three statements and you have to guess which one is false.
+A voice-powered appointment booking system that combines Google's Gemini Live conversational AI with the Model Context Protocol (MCP) for seamless appointment management.
 
-Learn how to run and deploy these bots on Pipecat Cloud.
+## Overview
 
-## Try it! 📞
+This project demonstrates a production-ready voice assistant named "Geny" that can:
+- Have natural voice conversations with users
+- Create and manage appointment bookings
+- Query existing bookings by customer name
+- Process voice commands in real-time
 
-Call **1-970-LIVE-API** (1-970-548-3274) to talk to a Gemini Live Pipecat bot over the phone.
+The system uses a modern architecture that separates concerns between the conversational AI layer and the business logic layer through the MCP protocol.
 
-## Prerequisites
+## Architecture
 
-### Environment
+### Conversational AI Layer
+**Gemini 2.5 Flash Native Audio** provides the conversational interface with these key features:
 
-- Python 3.10 or later
-- [uv](https://docs.astral.sh/uv/getting-started/installation/) package manager installed
+- **Native Audio Processing**: Direct audio-to-audio processing without intermediate text conversion
+- **Low Latency**: Real-time voice interactions with minimal delay
+- **Function Calling**: Structured tool invocation for booking operations
+- **Voice Identity**: Uses the "Charon" voice profile for consistent personality
+- **VAD (Voice Activity Detection)**: Silero VAD with 0.5-second stop detection for natural turn-taking
 
-### Service API keys
+### Transport Layer
+**Pipecat Framework** orchestrates the entire conversation pipeline:
 
-You'll need API keys for the following services:
-
-- [Gemini](https://aistudio.google.com/) LLMs: Live API and Text completions
-- [Google STT & TTS](https://console.cloud.google.com) for Speech-to-Text and Text-to-Speech
-- [Twilio](https://www.twilio.com/try-twilio) for phone calling
-
-> 💡 **Tip**: Sign up these services. You'll need them for both local and cloud deployment.
-
-## Setup
-
-1. Clone this repository
-
-   ```bash
-   git clone https://github.com/daily-co/pcc-gemini-twilio.git
-   cd pcc-gemini-twilio
-   ```
-
-2. Configure your API keys:
-
-   Create a `.env` file:
-
-   ```bash
-   cp env.example .env
-   ```
-
-   Then, add your API keys:
-
-   ```ini
-   GOOGLE_API_KEY=
-   GOOGLE_CREDENTIALS_PATH=./credentials.json
-   TWILIO_ACCOUNT_SID=
-   TWILIO_AUTH_TOKEN=
-   ```
-
-   > If you're running bot-cascade.py, you'll need to add a `credentials.json` file containing your Google Service Account credentials.
-
-3. Set up a virtual environment and install dependencies
-
-   ```bash
-   uv sync
-   ```
-
-## Run your bot locally
-
-For local development, we'll use Pipecat's P2P WebRTC transport, `SmallWebRTCTransport`. This transports is free to run and allows for faster iteration for development and testing.
-
-Run the bot using:
-
-```bash
-uv run bot.py
+```
+Audio Input → VAD → Transcription → LLM → Audio Output
+                ↓                    ↓
+            Transcript           Function Calls
 ```
 
-**Open http://localhost:7860 in your browser** and click `Connect` to start talking to your bot.
+Supports multiple transport protocols:
+- **Twilio**: For phone-based interactions
+- **WebRTC**: For browser-based voice chat
 
-> 💡 First run note: The initial startup may take ~20 seconds as Pipecat downloads required models and imports.
+### Business Logic Layer
+**MCP (Model Context Protocol)** bridges the AI and application logic:
 
-## Deploy to Production
+The system uses a NestJS-based MCP server that exposes booking operations as standardized tools. This architecture provides:
 
-Transform your local bot into a production-ready service. Pipecat Cloud handles scaling, monitoring, and global deployment.
+- **Separation of Concerns**: AI logic separate from business rules
+- **Standardized Interface**: MCP protocol for tool discovery and invocation
+- **Type Safety**: Structured schemas for all tool parameters
+- **Scalability**: Easy to add new booking types or services
+
+## MCP Protocol Implementation
+
+### What is MCP?
+
+The Model Context Protocol (MCP) is an open standard for connecting AI models to external tools and data sources. In this implementation, MCP acts as a bridge between Gemini's function calling and your booking backend.
+
+### MCP Client Architecture
+
+The `NestJSMCPClient` provides an HTTP-based interface to the MCP server:
+
+```python
+mcp_client = NestJSMCPClient(
+    base_url="http://localhost:3004",
+    api_key="your-api-key"
+)
+```
+
+#### Key Operations
+
+**Health Check**
+```python
+health = await mcp_client.health_check()
+# Returns: {"status": "healthy", "tools": [...]}
+```
+
+**Tool Discovery**
+```python
+tools = await mcp_client.list_tools()
+# Lists available MCP tools like make_booking, get_bookings
+```
+
+**Tool Invocation**
+```python
+result = await mcp_client.call_tool("make_booking", {
+    "name": "John Doe",
+    "phone": "+1234567890",
+    "service": "Haircut",
+    "timestamp": 1728648000
+})
+```
+
+### MCP Tool Definitions
+
+#### make_booking Tool
+Creates a new appointment with validation and conflict checking.
+
+**Parameters:**
+- `name` (string): Customer's full name
+- `phone` (string): Contact phone number
+- `service` (string): Service type (Haircut, Massage, Nails, etc.)
+- `date` (string): Date in YYYY-MM-DD format
+- `time` (string): Time in HH:MM format (24-hour)
+
+**Returns:**
+```json
+{
+  "status": "success",
+  "message": "Booking confirmed for John Doe...",
+  "confirmation": {...}
+}
+```
+
+#### get_bookings Tool
+Retrieves existing bookings for a customer.
+
+**Parameters:**
+- `name` (string): Customer name to search
+
+**Returns:**
+```json
+{
+  "status": "success",
+  "bookings": "Found 2 bookings: 1) Haircut on 2025-10-15..."
+}
+```
+
+## Function Handler Factory Pattern
+
+The code uses a factory pattern to inject the MCP client into function handlers:
+
+```python
+def make_booking_handler_factory(mcp_client: NestJSMCPClient):
+    async def make_booking_handler(params: FunctionCallParams):
+        # Access mcp_client via closure
+        result = await mcp_client.make_booking(...)
+        await params.result_callback(result)
+    return make_booking_handler
+
+# Register with LLM
+llm.register_function(
+    "make_booking", 
+    make_booking_handler_factory(mcp_client)
+)
+```
+
+This pattern ensures each function handler has access to the MCP client while maintaining clean separation of concerns.
+
+## Conversation Flow
+
+### Booking Appointment
+1. User: "I'd like to book a haircut"
+2. Geny: "I'd be happy to help! What's your name?"
+3. User: "John Doe"
+4. Geny: "Great! What's your phone number?"
+5. User: "555-1234"
+6. Geny: "When would you like to schedule your haircut?"
+7. User: "Next Friday at 2pm"
+8. Geny processes date/time → calls `make_booking` via MCP
+9. Geny: "Perfect! Your haircut is booked for Friday, October 18th at 2:00 PM"
+
+### Checking Bookings
+1. User: "Can you check my appointments?"
+2. Geny: "Sure! What name are your bookings under?"
+3. User: "John Doe"
+4. Geny calls `get_bookings` via MCP
+5. Geny: "You have 2 upcoming appointments: Haircut on October 18th..."
+
+## Setup Instructions
 
 ### Prerequisites
+- Python 3.9+
+- NestJS MCP server running
+- Google API key for Gemini
+- Twilio account (for phone integration) or WebRTC setup
 
-1. [Sign up for Pipecat Cloud](https://pipecat.daily.co/sign-up).
-
-2. Set up Docker for building your bot image:
-
-   - **Install [Docker](https://www.docker.com/)** on your system
-   - **Create a [Docker Hub](https://hub.docker.com/) account**
-   - **Login to Docker Hub:**
-
-     ```bash
-     docker login
-     ```
-
-3. Log in with the `pipecatcloud` CLI (installed with the project) is used to manage your deployment and secrets.
-
-   ```bash
-   uv run pcc auth login
-   ```
-
-   > Tip: Use the CLI with the `pcc` command alias.
-
-### Configure Twilio
-
-1. [Purchase a phone number](https://help.twilio.com/articles/223135247-How-to-Search-for-and-Buy-a-Twilio-Phone-Number-from-Console) from Twilio, if you haven't already. Ensure the number has voice capabilities.
-
-2. Retrieve your Pipecat Cloud organization name using the pipecatcloud CLI. This information is required when creating the TwiML configuration.
-
-   ```bash
-   pcc organizations list
-   ```
-
-3. Create a [TwiML Bin](https://help.twilio.com/articles/360043489573-Getting-started-with-TwiML-Bins) with the following configuration:
-
-   ```xml
-   <?xml version="1.0" encoding="UTF-8"?>
-   <Response>
-   <Connect>
-      <Stream url="wss://api.pipecat.daily.co/ws/twilio">
-         <Parameter name="_pipecatCloudServiceHost"
-            value="AGENT_NAME.ORGANIZATION_NAME"/>
-      </Stream>
-   </Connect>
-   </Response>
-   ```
-
-   Replace the placeholder values:
-
-   - `AGENT_NAME` with your deployed bot’s name (e.g., my-first-agent)
-   - `ORGANIZATION_NAME` with your organization name from step 2
-
-   For example, if your agent is named “pcc-gemini-twilio” and your organization is “industrious-purple-cat-123”, your value would be: pcc-gemini-twilio.industrious-purple-cat-123
-
-4. Assign the TwiML Bin to your Twilio phone number:
-
-   - Navigate to the "Phone Numbers" section in your Twilio dashboard (Phone Numbers > Manage > Active numbers)
-   - Select your phone number from the list
-   - In the "Configure" tab, under “Voice Configuration” section, find “A call comes in”
-     - Set this dropdown to “TwiML Bin”
-     - Select the "TwiML Bin" you created in step 3
-   - Click Save to apply your changes
-
-### Configure your deployment
-
-The `pcc-deploy.toml` file tells Pipecat Cloud how to run your bot. **Update the `image` field** with your Docker Hub username by editing `pcc-deploy.toml`.
-
-```ini
-agent_name = "pcc-gemini-twilio"
-image = "YOUR_DOCKERHUB_USERNAME/pcc-gemini-twilio:0.1" # 👈 Update this line
-secret_set = "pcc-gemini-twilio-secrets"
-
-[scaling]
-	min_agents = 1
-```
-
-**Understanding the TOML file settings:**
-
-- `agent_name`: Your bot's name in Pipecat Cloud
-- `image`: The Docker image to deploy (format: `username/image:version`)
-- `secret_set`: Where your API keys are stored securely
-- `min_agents`: Number of bot instances to keep ready (1 = instant start)
-
-> 💡 Tip: [Set up `image_credentials`](https://docs.pipecat.ai/deployment/pipecat-cloud/fundamentals/secrets#image-pull-secrets) in your TOML file for authenticated image pulls
-
-### Configure secrets
-
-Upload your API keys to Pipecat Cloud's secure storage:
-
+### Environment Variables
 ```bash
-uv run pcc secrets set pcc-gemini-twilio-secrets --file .env
+GOOGLE_API_KEY=your_gemini_api_key
+MCP_SERVER_URL=http://localhost:3004
+MCP_API_KEY=your_mcp_api_key
+ENV=local  # or production
 ```
 
-This creates a secret set called `pcc-gemini-twilio-secrets` (matching your TOML file) and uploads all your API keys from `.env`.
-
-### Build and deploy
-
-Build your Docker image and push to Docker Hub:
-
+### Installation
 ```bash
-uv run pcc docker build-push
+pip install -r requirements.txt
+python bot.py
 ```
 
-Deploy to Pipecat Cloud:
-
+### Running Locally
 ```bash
-uv run pcc deploy
+# Start MCP server first
+cd mcp-server && npm run start
+
+# Start bot
+python bot.py
 ```
 
-### Call your bot
+## Key Features
 
-Call the Twilio number you set up earlier to speak with your bot! 🚀
+### Timezone Handling
+The system converts human-readable dates/times to Unix timestamps with timezone awareness:
 
-## What's Next?
+```python
+lagos_tz = pytz.timezone('America/Los_Angeles')
+dt = lagos_tz.localize(datetime.strptime("2025-10-15 14:00", "%Y-%m-%d %H:%M"))
+timestamp = int(dt.timestamp())
+```
 
-- **🔧 Customize your bot**: Modify `bot.py` to change personality, add functions, or integrate with your data
-- **📚 Learn more**: Check out [Pipecat's docs](https://docs.pipecat.ai/) for advanced features
-- **⚙️ Provide custom data**: [Learn how to provide custom data](https://docs.pipecat.ai/guides/telephony/twilio-websockets#custom-parameters-with-twiml) to your bot at run time
-- **💬 Get help**: Join [Pipecat's Discord](https://discord.gg/pipecat) to connect with the community
+### Error Handling
+Comprehensive error handling at every layer:
+- Invalid date/time formats
+- Missing required fields
+- MCP server connectivity issues
+- Booking conflicts
+
+### Session Management
+Automatic cleanup of resources:
+```python
+@transport.event_handler("on_client_disconnected")
+async def on_client_disconnected(transport, client):
+    await mcp_client.close()  # Clean session termination
+```
+
+## Benefits of This Architecture
+
+1. **Modularity**: Easy to swap Gemini for another LLM or add new MCP tools
+2. **Testability**: MCP layer can be tested independently
+3. **Scalability**: Add new services without touching AI logic
+4. **Maintainability**: Clear separation between conversation and business logic
+5. **Extensibility**: MCP protocol makes adding new capabilities straightforward
+
+## Future Enhancements
+
+- Add booking cancellation/modification tools
+- Support multiple languages through Gemini's multilingual capabilities
+- Implement booking reminders via MCP
+- Add calendar availability checking
+- Support group bookings
+- Integration with payment processing
+
+## License
+
+Copyright (c) 2024–2025, Daily  
+BSD 2-Clause License
+
+## Contributing
+
+Contributions welcome! Key areas for improvement:
+- Additional MCP tools for booking management
+- Enhanced error recovery strategies
+- Support for more transport protocols
+- Improved natural language date/time parsing

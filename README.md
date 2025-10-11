@@ -1,30 +1,45 @@
-# Conversational Booking Bot with MCP Protocol
+# Geny Voice Receptionist  
+*A conversational booking assistant built with Gemini 2.5 Flash, Pipecat, and the Model Context Protocol (MCP).*
 
-A voice-powered appointment booking system that combines Google's Gemini Live conversational AI with the Model Context Protocol (MCP) for seamless appointment management.
+---
 
-## Overview
+## What is this?
 
-This project demonstrates a production-ready voice assistant named "Geny" that can:
-- Have natural voice conversations with users
-- Create and manage appointment bookings
-- Query existing bookings by customer name
-- Process voice commands in real-time
+**Geny Voice Receptionist** is a voice-powered assistant that answers calls and messages for busy service professionals — like nail techs, barbers, or estheticians — so they never miss a client.
 
-The system uses a modern architecture that separates concerns between the conversational AI layer and the business logic layer through the MCP protocol.
+When a client calls or texts, Geny picks up instantly, speaks naturally, and can:
+- Check prices or available services  
+- Book or reschedule appointments  
+- Take messages for review later  
 
-## Architecture
+After each interaction, Geny sends a short **voice summary** to the business owner:  
+> “Jasmine booked a nail refill for 2 PM tomorrow.”
 
-### Conversational AI Layer
-**Gemini 2.5 Flash Native Audio** provides the conversational interface with these key features:
+This project demonstrates a **production-ready, real-time conversational pipeline** powered by **Gemini** and **Pipecat**, connected to a structured booking backend via the **Model Context Protocol (MCP)**.
 
-- **Native Audio Processing**: Direct audio-to-audio processing without intermediate text conversion
-- **Low Latency**: Real-time voice interactions with minimal delay
-- **Function Calling**: Structured tool invocation for booking operations
-- **Voice Identity**: Uses the "Charon" voice profile for consistent personality
-- **VAD (Voice Activity Detection)**: Silero VAD with 0.5-second stop detection for natural turn-taking
+---
 
-### Transport Layer
-**Pipecat Framework** orchestrates the entire conversation pipeline:
+## A video (less than 60 seconds)
+
+**[Demo Video → Add link here after upload]**
+
+*(The demo should show: incoming call → Geny responds → booking confirmation → owner voice summary.)*
+
+---
+
+## Describe how you used Gemini models and Pipecat
+
+**Gemini** and **Pipecat** form the conversational intelligence and transport backbone of Geny.
+
+### Gemini 2.5 Flash Native Audio
+- Provides end-to-end **speech-to-speech reasoning** for natural voice conversation.  
+- Handles intent detection (e.g., “check price,” “book appointment,” “leave message”).  
+- Executes **function calls** to MCP tools for structured booking actions.  
+- Synthesizes real-time, low-latency speech responses.  
+
+### Pipecat Framework
+- Orchestrates the full pipeline:
+
 
 ```
 Audio Input → VAD → Transcription → LLM → Audio Output
@@ -32,220 +47,57 @@ Audio Input → VAD → Transcription → LLM → Audio Output
             Transcript           Function Calls
 ```
 
-Supports multiple transport protocols:
-- **Twilio**: For phone-based interactions
-- **WebRTC**: For browser-based voice chat
+- Supports multiple transports (Twilio for phone, WebRTC for browser-based voice).  
+- Manages the **streaming connection**, message turn-taking, and latency tracing.  
 
-### Business Logic Layer
-**MCP (Model Context Protocol)** bridges the AI and application logic:
+Together, Gemini and Pipecat enable Geny to act as a **fully autonomous voice receptionist** with real-time comprehension and response.
 
-The system uses a NestJS-based MCP server that exposes booking operations as standardized tools. This architecture provides:
+---
 
-- **Separation of Concerns**: AI logic separate from business rules
-- **Standardized Interface**: MCP protocol for tool discovery and invocation
-- **Type Safety**: Structured schemas for all tool parameters
-- **Scalability**: Easy to add new booking types or services
+## Describe other tools you used
 
-## MCP Protocol Implementation
+| Tool | Role |
+|------|------|
+| **Model Context Protocol (MCP)** | Bridges Gemini’s function calls with backend booking logic (implemented via a NestJS MCP server). |
+| **Langfuse** | Logs and visualizes voice interaction traces for debugging and evaluation. |
+| **Twilio (Pipecat Transports)** | Enables live call and browser voice connections. |
+| **ElevenLabs** | Provides the branded “Geny” voice for consistent identity. |
+| **FastAPI / Python 3.9** | Powers the conversational layer and MCP client. |
 
-### What is MCP?
+---
 
-The Model Context Protocol (MCP) is an open standard for connecting AI models to external tools and data sources. In this implementation, MCP acts as a bridge between Gemini's function calling and your booking backend.
+## Tell us what you did new during the hackathon
 
-### MCP Client Architecture
+During the hackathon, we extended our existing MCP booking assistant into a **real-time voice receptionist** by integrating Gemini and Pipecat.
 
-The `NestJSMCPClient` provides an HTTP-based interface to the MCP server:
+### 🚀 New Components Built:
+- **Gemini × Pipecat 3-model speech loop** for natural speech-to-speech interaction.  
+- **Busy Mode trigger** that activates when the owner is serving a client.  
+- New **Gemini function calls** for:
+- `check_price`
+- `book_appointment`
+- `leave_message`
+- **Voice summary generator** to provide the business owner with short audio recaps.  
+- **Langfuse tracing layer** to monitor performance and conversation flow.  
 
-```python
-mcp_client = NestJSMCPClient(
-    base_url="http://localhost:3004",
-    api_key="your-api-key"
-)
-```
+These additions transformed the project from a booking demo into a **fully conversational receptionist** capable of real-time, hands-free operation.
 
-#### Key Operations
+---
 
-**Health Check**
-```python
-health = await mcp_client.health_check()
-# Returns: {"status": "healthy", "tools": [...]}
-```
+## Give feedback on the tools you used
 
-**Tool Discovery**
-```python
-tools = await mcp_client.list_tools()
-# Lists available MCP tools like make_booking, get_bookings
-```
+| Tool | What worked well | What could improve |
+|------|------------------|--------------------|
+| **Gemini 2.5 Flash** | Excellent at real-time reasoning and context retention. | Occasional delays in transcription under background noise. |
+| **Pipecat** | Beautifully modular and simple to extend with transports. | More examples for Twilio routing would speed up setup. |
+| **Langfuse** | Great for tracing and debugging conversational pipelines. | Inline audio playback would improve usability. |
+| **MCP Protocol** | Clean separation between AI and backend business logic. | A Python-native SDK would simplify client development. |
 
-**Tool Invocation**
-```python
-result = await mcp_client.call_tool("make_booking", {
-    "name": "John Doe",
-    "phone": "+1234567890",
-    "service": "Haircut",
-    "timestamp": 1728648000
-})
-```
+Overall, the stack was remarkably fast to integrate — we were able to get from idea to live demo in under 5 hours.
 
-### MCP Tool Definitions
+---
+### 👩🏽‍💻 Credits  
+Built by the **Geny Labs** team — a global group developing AI assistants for skilled-service entrepreneurs.  
 
-#### make_booking Tool
-Creates a new appointment with validation and conflict checking.
+**License:** BSD 2-Clause © 2025 Daily & Geny Labs Inc.  
 
-**Parameters:**
-- `name` (string): Customer's full name
-- `phone` (string): Contact phone number
-- `service` (string): Service type (Haircut, Massage, Nails, etc.)
-- `date` (string): Date in YYYY-MM-DD format
-- `time` (string): Time in HH:MM format (24-hour)
-
-**Returns:**
-```json
-{
-  "status": "success",
-  "message": "Booking confirmed for John Doe...",
-  "confirmation": {...}
-}
-```
-
-#### get_bookings Tool
-Retrieves existing bookings for a customer.
-
-**Parameters:**
-- `name` (string): Customer name to search
-
-**Returns:**
-```json
-{
-  "status": "success",
-  "bookings": "Found 2 bookings: 1) Haircut on 2025-10-15..."
-}
-```
-
-## Function Handler Factory Pattern
-
-The code uses a factory pattern to inject the MCP client into function handlers:
-
-```python
-def make_booking_handler_factory(mcp_client: NestJSMCPClient):
-    async def make_booking_handler(params: FunctionCallParams):
-        # Access mcp_client via closure
-        result = await mcp_client.make_booking(...)
-        await params.result_callback(result)
-    return make_booking_handler
-
-# Register with LLM
-llm.register_function(
-    "make_booking", 
-    make_booking_handler_factory(mcp_client)
-)
-```
-
-This pattern ensures each function handler has access to the MCP client while maintaining clean separation of concerns.
-
-## Conversation Flow
-
-### Booking Appointment
-1. User: "I'd like to book a haircut"
-2. Geny: "I'd be happy to help! What's your name?"
-3. User: "John Doe"
-4. Geny: "Great! What's your phone number?"
-5. User: "555-1234"
-6. Geny: "When would you like to schedule your haircut?"
-7. User: "Next Friday at 2pm"
-8. Geny processes date/time → calls `make_booking` via MCP
-9. Geny: "Perfect! Your haircut is booked for Friday, October 18th at 2:00 PM"
-
-### Checking Bookings
-1. User: "Can you check my appointments?"
-2. Geny: "Sure! What name are your bookings under?"
-3. User: "John Doe"
-4. Geny calls `get_bookings` via MCP
-5. Geny: "You have 2 upcoming appointments: Haircut on October 18th..."
-
-## Setup Instructions
-
-### Prerequisites
-- Python 3.9+
-- NestJS MCP server running
-- Google API key for Gemini
-- Twilio account (for phone integration) or WebRTC setup
-
-### Environment Variables
-```bash
-GOOGLE_API_KEY=your_gemini_api_key
-MCP_SERVER_URL=http://localhost:3004
-MCP_API_KEY=your_mcp_api_key
-ENV=local  # or production
-```
-
-### Installation
-```bash
-pip install -r requirements.txt
-python bot.py
-```
-
-### Running Locally
-```bash
-# Start MCP server first
-cd mcp-server && npm run start
-
-# Start bot
-python bot.py
-```
-
-## Key Features
-
-### Timezone Handling
-The system converts human-readable dates/times to Unix timestamps with timezone awareness:
-
-```python
-lagos_tz = pytz.timezone('America/Los_Angeles')
-dt = lagos_tz.localize(datetime.strptime("2025-10-15 14:00", "%Y-%m-%d %H:%M"))
-timestamp = int(dt.timestamp())
-```
-
-### Error Handling
-Comprehensive error handling at every layer:
-- Invalid date/time formats
-- Missing required fields
-- MCP server connectivity issues
-- Booking conflicts
-
-### Session Management
-Automatic cleanup of resources:
-```python
-@transport.event_handler("on_client_disconnected")
-async def on_client_disconnected(transport, client):
-    await mcp_client.close()  # Clean session termination
-```
-
-## Benefits of This Architecture
-
-1. **Modularity**: Easy to swap Gemini for another LLM or add new MCP tools
-2. **Testability**: MCP layer can be tested independently
-3. **Scalability**: Add new services without touching AI logic
-4. **Maintainability**: Clear separation between conversation and business logic
-5. **Extensibility**: MCP protocol makes adding new capabilities straightforward
-
-## Future Enhancements
-
-- Add booking cancellation/modification tools
-- Support multiple languages through Gemini's multilingual capabilities
-- Implement booking reminders via MCP
-- Add calendar availability checking
-- Support group bookings
-- Integration with payment processing
-
-## License
-
-Copyright (c) 2024–2025, Daily  
-BSD 2-Clause License
-
-## Contributing
-
-Contributions welcome! Key areas for improvement:
-- Additional MCP tools for booking management
-- Enhanced error recovery strategies
-- Support for more transport protocols
-- Improved natural language date/time parsing

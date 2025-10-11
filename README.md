@@ -89,7 +89,6 @@ These additions transformed the project from a booking demo into a **fully conve
 |------|------------------|--------------------|
 | **Gemini 2.5 Flash** | Excellent at real-time reasoning and context retention. | Occasional delays in transcription under background noise. |
 | **Pipecat** | Beautifully modular and simple to extend with transports. | More examples for Twilio routing would speed up setup. |
-| **Langfuse** | Great for tracing and debugging conversational pipelines. | Inline audio playback would improve usability. |
 | **MCP Protocol** | Clean separation between AI and backend business logic. | A Python-native SDK would simplify client development. |
 
 Overall, the stack was remarkably fast to integrate — we were able to get from idea to live demo in under 5 hours.

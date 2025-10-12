@@ -77,7 +77,6 @@ During the hackathon, we extended our existing MCP booking assistant into a **re
 - `book_appointment`
 - `leave_message`
 - **Voice summary generator** to provide the business owner with short audio recaps.  
-- **Langfuse tracing layer** to monitor performance and conversation flow.  
 
 These additions transformed the project from a booking demo into a **fully conversational receptionist** capable of real-time, hands-free operation.
 

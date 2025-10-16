@@ -1,60 +1,42 @@
-# FROM dailyco/pipecat-base:latest
+# ========= BASE IMAGE =========
+# Use lightweight Python 3.11 base
+FROM python:3.11-slim
 
-# # Enable bytecode compilation
-# ENV UV_COMPILE_BYTECODE=1
+# ========= SYSTEM DEPENDENCIES =========
+# Install essential packages for Pipecat, audio, FFmpeg, etc.
+RUN apt-get update && apt-get install -y \
+    git \
+    ffmpeg \
+    portaudio19-dev \
+    libsndfile1 \
+    libasound2-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# # Copy from the cache instead of linking since it's a mounted volume
-# ENV UV_LINK_MODE=copy
-
-# # Install Git (required for dependencies pulled from git+ URLs)
-# RUN apt-get update && apt-get install -y git && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# # Install the project's dependencies using the lockfile and settings
-# RUN --mount=type=cache,target=/root/.cache/uv \
-#     --mount=type=bind,source=uv.lock,target=uv.lock \
-#     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-#     uv sync --locked --no-install-project --no-dev
-
-# COPY ./botclient.py botclient.py
-
-# # Copy the Gemini Live application code
-# COPY ./geny-bot.py bot.py
-
-# # Optionally copy other files
-# # COPY ./credentials.json credentials.json
-# # COPY ./bot-cascade.py bot.py
-
-
-
-# FROM dailyco/pipecat-base:latest
-FROM ghcr.io/daily-co/pipecat-base:latest
-
-# Enable bytecode compilation
+# ========= ENVIRONMENT SETTINGS =========
+ENV PYTHONUNBUFFERED=1
 ENV UV_COMPILE_BYTECODE=1
-
-# Copy from the cache instead of linking since it's a mounted volume
 ENV UV_LINK_MODE=copy
-
-# Install Git (required for dependencies pulled from git+ URLs)
-RUN apt-get update && apt-get install -y git && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Set working directory
+ENV PYTHONPATH=/app
 WORKDIR /app
 
-# Install dependencies from pyproject + lock
+# ========= DEPENDENCIES =========
+# Copy dependency manifests first (for Docker layer caching)
+COPY pyproject.toml uv.lock ./
+
+# Install UV package manager if not already included
+RUN pip install --no-cache-dir uv
+
+# Install dependencies from the lockfile
 RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --locked --no-install-project --no-dev
 
-# Copy your bot source code into /app
-# COPY ./botclient.py /app/botclient.py
+# ========= APP SOURCE CODE =========
 COPY ./geny-bot.py /app/bot.py
 
-ENV PYTHONPATH=/app
+# ========= ENV VARIABLES =========
+# These should be provided at runtime (not baked into the image)
+# e.g. GOOGLE_API_KEY, MCP_SERVER_URL, MCP_API_KEY, etc.
+ENV ENV=local
 
-# Optional: copy any credentials or support files
-# COPY ./credentials.json /app/credentials.json
-
-# Default command (Pipecat base image runs your app automatically)
+# ========= ENTRYPOINT =========
 CMD ["python", "bot.py"]

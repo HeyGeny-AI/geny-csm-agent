@@ -30,4 +30,4 @@ RUN pip install --no-cache-dir git+https://github.com/modelcontextprotocol/pytho
 COPY . .
 
 # Run the bot
-CMD ["python", "geny-bot.py"]
+CMD ["python", "server.py"]

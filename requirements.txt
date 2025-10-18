@@ -10,3 +10,4 @@ pytz
 twilio
 pipecat-ai[silero]
 onnxruntime
+pipecat-ai[google]

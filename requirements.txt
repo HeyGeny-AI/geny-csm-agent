@@ -8,3 +8,5 @@ google-generativeai
 aiohttp
 pytz
 twilio
+pipecat-ai[silero]
+onnxruntime

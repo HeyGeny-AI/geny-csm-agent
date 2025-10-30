@@ -172,7 +172,7 @@ async def run_bot(transport: FastAPIWebsocketTransport, runner_args: RunnerArgum
 
     # Initialize MCP client
     mcp_client = NestJSMCPClient(
-        base_url=os.getenv("MCP_SERVER_URL", "http://localhost:3004"),
+        base_url=os.getenv("MCP_SERVER_URL", "http://localhost:3004/v1"),
         api_key=os.getenv("MCP_API_KEY", ""),
     )
 
@@ -227,11 +227,11 @@ Be concise, polite, and natural in your voice responses.
     llm.register_function("get_bookings", get_bookings_handler_factory(mcp_client))
 
     # Conversation context
-    # messages = [{"role": "user", "content": "Hi Geny, can you help me book a service?"}]
-    messages = [
-        {"role": "system", "content": "You are Geny, a friendly AI assistant who helps users book services and manage appointment ."},
-        {"role": "assistant", "content": "Hi, I am Geny, I can help you book services and manage appointment  "},
-    ]
+    messages = [{"role": "user", "content": "Hi Geny, can you help me book a service?"}]
+    # messages = [
+    #     {"role": "system", "content": "You are Geny, a friendly AI assistant who helps users book services and manage appointment ."},
+    #     {"role": "assistant", "content": "Hi, I am Geny, I can help you book services and manage appointment  "},
+    # ]
     context = OpenAILLMContext(messages)
     context_aggregator = llm.create_context_aggregator(context)
     transcript = TranscriptProcessor()

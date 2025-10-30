@@ -186,7 +186,7 @@ async def run_bot(transport: FastAPIWebsocketTransport, runner_args: RunnerArgum
             "date": {"type": "string"},
             "time": {"type": "string"},
         },
-        required=["name", "phone", "service", "date", "time"],
+        required=["name", "service", "date", "time"],
     )
 
     get_bookings_function = FunctionSchema(

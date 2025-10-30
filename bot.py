@@ -227,7 +227,11 @@ Be concise, polite, and natural in your voice responses.
     llm.register_function("get_bookings", get_bookings_handler_factory(mcp_client))
 
     # Conversation context
-    messages = [{"role": "user", "content": "Hi Geny, can you help me book a service?"}]
+    # messages = [{"role": "user", "content": "Hi Geny, can you help me book a service?"}]
+    messages = [
+        {"role": "system", "content": "You are Geny, a friendly AI assistant who helps users book services and manage appointment ."},
+        {"role": "assistant", "content": "Hi, I am Geny, I can help you book services and manage appointment  "},
+    ]
     context = OpenAILLMContext(messages)
     context_aggregator = llm.create_context_aggregator(context)
     transcript = TranscriptProcessor()
@@ -314,10 +318,9 @@ async def bot(runner_args: RunnerArguments):
         ),
     )
 
-    caller_number = call_data.get("from", "")
-    print(call_data)
-    print(">>>>>>>>>>>>>>>.")
-    print(call_data['from'])
+  
+    caller_number = call_data.get("body", {}).get("from", "")
+
     logger.info(f"📱 Caller number detected in bot.py: {caller_number}")
 
     await run_bot(transport, runner_args, caller_number)

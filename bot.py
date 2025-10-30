@@ -103,7 +103,11 @@ class NestJSMCPClient:
 # -------------------------------------------------------
 
 def make_booking_handler_factory(mcp_client: NestJSMCPClient, default_phone: str = ""):
+    logger.info(f"📱 Caller number detected in inside make_booking_handler_factory : {default_phone}")
+
     async def make_booking_handler(params: FunctionCallParams):
+
+        logger.info(f"📱 Caller number detected in inside make_booking_handler function : {default_phone}")
         arguments = params.arguments or {}
         logger.info(f"Received booking request: {arguments}")
         try:
@@ -162,6 +166,9 @@ def get_bookings_handler_factory(mcp_client: NestJSMCPClient):
 
 async def run_bot(transport: FastAPIWebsocketTransport, runner_args: RunnerArguments, caller_number: str = ""):
     logger.info("🚀 Starting Gemini + Twilio booking bot")
+
+
+    logger.info(f"📱 Caller number detected in inside run_bot : {caller_number}")
 
     # Initialize MCP client
     mcp_client = NestJSMCPClient(
@@ -308,6 +315,8 @@ async def bot(runner_args: RunnerArguments):
     )
 
     caller_number = call_data.get("from", "")
+    logger.info(f"📱 Caller number detected in bot.py: {caller_number}")
+
     await run_bot(transport, runner_args, caller_number)
 
 

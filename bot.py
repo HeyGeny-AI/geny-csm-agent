@@ -315,6 +315,9 @@ async def bot(runner_args: RunnerArguments):
     )
 
     caller_number = call_data.get("from", "")
+    print(call_data)
+    print(">>>>>>>>>>>>>>>.")
+    print(call_data['from'])
     logger.info(f"📱 Caller number detected in bot.py: {caller_number}")
 
     await run_bot(transport, runner_args, caller_number)

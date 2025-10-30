@@ -119,34 +119,6 @@ async def start_call(request: Request):
 
     return HTMLResponse(content=twiml_content, media_type="application/xml")
 
-
-# @app.websocket("/ws")
-# async def websocket_endpoint(websocket: WebSocket):
-#     """Handle WebSocket connections for inbound calls."""
-#     await websocket.accept()
-#     print("WebSocket connection accepted for inbound call")
-
-#     try:
-#         # Import the bot function from the bot module
-#         from bot import bot
-#         from pipecat.runner.types import WebSocketRunnerArguments
-
-#         # Create runner arguments and run the bot
-#         runner_args = WebSocketRunnerArguments(websocket=websocket)
-#         runner_args.handle_sigint = False
-
-#         # Only pass testing argument for local development
-#         env = os.getenv("ENV", "local").lower()
-#         if env == "local":
-#             await bot(runner_args)
-#         else:
-#             await bot(runner_args)
-
-#     except Exception as e:
-#         print(f"Error in WebSocket endpoint: {e}")
-#         await websocket.close()
-
-
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     print("💡 Twilio attempting WebSocket connection...")

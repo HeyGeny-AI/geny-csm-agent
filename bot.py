@@ -102,16 +102,25 @@ class NestJSMCPClient:
 # Booking Handlers
 # -------------------------------------------------------
 
-def make_booking_handler_factory(mcp_client: NestJSMCPClient):
+def make_booking_handler_factory(mcp_client: NestJSMCPClient, default_phone: str = ""):
     async def make_booking_handler(params: FunctionCallParams):
         arguments = params.arguments or {}
         logger.info(f"Received booking request: {arguments}")
         try:
             name = arguments.get("name")
-            phone = arguments.get("phone")
+            phone = arguments.get("phone") or default_phone
             service = arguments.get("service")
             date = arguments.get("date")
             time = arguments.get("time")
+
+            # If default phone is missing, ask user for it conversationally
+            if not phone:
+                await params.result_callback({
+                    "status": "missing_info",
+                    "message": "I don’t have your phone number yet. Could you please provide it so I can complete your booking?"
+                })
+                return
+            
             if not all([name, phone, service, date, time]):
                 raise ValueError("Missing required booking fields")
 
@@ -151,7 +160,7 @@ def get_bookings_handler_factory(mcp_client: NestJSMCPClient):
 # Gemini + Twilio Bot
 # -------------------------------------------------------
 
-async def run_bot(transport: FastAPIWebsocketTransport, runner_args: RunnerArguments):
+async def run_bot(transport: FastAPIWebsocketTransport, runner_args: RunnerArguments, caller_number: str = ""):
     logger.info("🚀 Starting Gemini + Twilio booking bot")
 
     # Initialize MCP client
@@ -298,7 +307,8 @@ async def bot(runner_args: RunnerArguments):
         ),
     )
 
-    await run_bot(transport, runner_args)
+    caller_number = call_data.get("from", "")
+    await run_bot(transport, runner_args, caller_number)
 
 
 # -------------------------------------------------------

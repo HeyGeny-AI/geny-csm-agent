@@ -216,7 +216,7 @@ Be concise, polite, and natural in your voice responses.
     )
 
     # Register handlers
-    llm.register_function("make_booking", make_booking_handler_factory(mcp_client))
+    llm.register_function("make_booking", make_booking_handler_factory(mcp_client, default_phone=caller_number))
     llm.register_function("get_bookings", get_bookings_handler_factory(mcp_client))
 
     # Conversation context

@@ -13,6 +13,16 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import HTMLResponse
 from twilio.twiml.voice_response import Connect, Stream, VoiceResponse
+# from pipecat.transports.websocket.fastapi import FastAPIWebsocketTransport, FastAPIWebsocketParams
+
+
+from fastapi import FastAPI, WebSocket
+from pipecat.runner.types import WebSocketRunnerArguments
+from pipecat.transports.websocket.fastapi import (
+    FastAPIWebsocketTransport,
+    FastAPIWebsocketParams,
+)
+from bot import run_bot
 
 # Load environment variables from .env file
 load_dotenv()
@@ -140,6 +150,36 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close()
 
 
+@app.websocket("/ws-browser")
+async def websocket_browser(websocket: WebSocket):
+    print("💡 Browser attempting WebSocket connection...")
+    await websocket.accept()
+    print("✅ WebSocket connection accepted for browser client")
+
+    try:
+        runner_args = WebSocketRunnerArguments(websocket=websocket)
+        runner_args.handle_sigint = False
+
+        # Create Pipecat transport for browser audio
+        transport = FastAPIWebsocketTransport(
+            websocket=websocket,
+            params=FastAPIWebsocketParams(
+                audio_in_enabled=True,
+                audio_out_enabled=True,
+            ),
+        )
+
+        await run_bot(
+            transport=transport,
+            runner_args=runner_args,
+            caller_number="browser-user",
+        )
+
+    except Exception as e:
+        import traceback
+        print("❌ ERROR in browser WebSocket endpoint:\n", traceback.format_exc())
+        await websocket.close()
+        
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pipecat Twilio Chatbot Server")
     parser.add_argument(

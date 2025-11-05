@@ -98,3 +98,6 @@ Built by the **Geny Labs** team — a global group developing AI assistants for 
 
 **License:** BSD 2-Clause © 2025 Daily & Geny Labs Inc.  
 
+
+uv run bot.py 
+uv run server.py 

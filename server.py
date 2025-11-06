@@ -136,13 +136,13 @@ async def twilio_websocket_endpoint(websocket: WebSocket):
     print("✅ Twilio WebSocket connection accepted for inbound call")
 
     try:
-        from bot import run_bot
+        from bot import bot
         from pipecat.runner.types import WebSocketRunnerArguments
 
         runner_args = WebSocketRunnerArguments(websocket=websocket)
         runner_args.handle_sigint = False
 
-        await bot_connect(runner_args)
+        await bot(runner_args)
 
     except Exception as e:
         import traceback
@@ -165,7 +165,6 @@ from pipecat.serializers.protobuf import ProtobufFrameSerializer
 
 @app.websocket("/ws-browser")
 async def websocket_browser(websocket: WebSocket):
-
 
     print("💡 Browser attempting WebSocket connection...")
     print(f"Headers: {websocket.headers}")

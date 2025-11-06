@@ -35,6 +35,8 @@ from pipecat.services.llm_service import FunctionCallParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketTransport, FastAPIWebsocketParams
 from pipecat.transports.base_transport import TransportParams
 
+
+
 load_dotenv(override=True)
 
 # -------------------------------------------------------
@@ -375,11 +377,21 @@ Be concise, polite, and natural in your voice responses.
         await task.cancel()
         await mcp_client.close()
 
+    # @transcript.event_handler("on_transcript_update")
+    # async def on_transcript(processor, frame):
+    #     for msg in frame.messages:
+    #         if isinstance(msg, TranscriptionMessage):
+    #             logger.info(f"{msg.role}: {msg.content}")
+
     @transcript.event_handler("on_transcript_update")
     async def on_transcript(processor, frame):
-        for msg in frame.messages:
-            if isinstance(msg, TranscriptionMessage):
-                logger.info(f"{msg.role}: {msg.content}")
+        for msg in getattr(frame, "messages", []):
+            role = getattr(msg, "role", "unknown")
+            text = getattr(msg, "text", None) or getattr(msg, "content", None)
+            if text:
+                print(f"{role}: {text}")
+
+    
 
     runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
     try:
@@ -392,7 +404,125 @@ Be concise, polite, and natural in your voice responses.
 # Unified Transport Entry Point (Twilio + WebRTC)
 # -------------------------------------------------------
 
+import os
+import logging
+from pipecat.runner.types import RunnerArguments
+
+logger = logging.getLogger(__name__)
+
+
 async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with both Twilio and WebRTC clients."""
+    logger.info("🚀 Starting Gemini bot (Twilio/WebRTC support)")
+
+    # ─────────────────────────────
+    # Optional noise filter
+    # ─────────────────────────────
+    krisp_filter = None
+    if os.environ.get("ENV") != "local":
+        try:
+            from pipecat.audio.filters.krisp_filter import KrispFilter
+            krisp_filter = KrispFilter()
+            logger.info("✅ Krisp noise filter enabled")
+        except ImportError:
+            logger.warning("⚠️ Krisp filter not available, continuing without it")
+
+    caller_number = ""
+    context = {}
+
+    # ─────────────────────────────
+    # Try Twilio detection first
+    # ─────────────────────────────
+    try:
+        transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
+        logger.info(f"📞 Detected transport type: {transport_type}")
+
+        if transport_type == "twilio":
+            caller_number = call_data.get("body", {}).get("from", "")
+            to_number = call_data.get("body", {}).get("to", "")
+            logger.info(f"📱 Twilio caller number: {caller_number} → {to_number}")
+
+            serializer = TwilioFrameSerializer(
+                stream_sid=call_data["stream_id"],
+                call_sid=call_data["call_id"],
+                account_sid=os.getenv("TWILIO_ACCOUNT_SID", ""),
+                auth_token=os.getenv("TWILIO_AUTH_TOKEN", ""),
+            )
+
+            transport = FastAPIWebsocketTransport(
+                websocket=runner_args.websocket,
+                params=FastAPIWebsocketParams(
+                    audio_in_enabled=True,
+                    audio_out_enabled=True,
+                    add_wav_header=False,
+                    audio_in_filter=krisp_filter,
+                    vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.5)),
+                    serializer=serializer,
+                ),
+            )
+
+            context = {
+                "type": "customer",
+                "channel": "twilio",
+                "branch": "123456",
+                "language": "en",
+                "session": "1234",
+                "call_info": {
+                    "caller": caller_number,
+                    "recipient": to_number,
+                    "call_sid": call_data["call_id"],
+                    "stream_sid": call_data["stream_id"],
+                    "account_sid": os.getenv("TWILIO_ACCOUNT_SID", ""),
+                },
+            }
+
+            logger.info(f"👤 Twilio context: {context}")
+            await run_bot(transport, runner_args, caller_number, context)
+            return
+
+    except Exception as e:
+        logger.info(f"ℹ️ Not a Twilio connection, falling back to WebRTC: {e}")
+
+    # ─────────────────────────────
+    # WebRTC fallback
+    # ─────────────────────────────
+    try:
+        logger.info("🌐 Using WebRTC transport")
+
+        # Manually build transport (since create_transport doesn't accept force_type)
+        params = TransportParams(
+            audio_in_enabled=True,
+            audio_in_filter=krisp_filter,
+            audio_out_enabled=True,
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.5)),
+            serializer=ProtobufFrameSerializer(),  # 
+        )
+
+        transport = FastAPIWebsocketTransport(
+            websocket=runner_args.websocket,
+            params=FastAPIWebsocketParams(**params.__dict__)
+        )
+
+        context = {
+            "branch": "123456",
+            "type": "business",
+            "channel": "webrtc",
+            "language": "en",
+            "session": "1234",
+        }
+
+        logger.info(f"👤 WebRTC context: {context}")
+        await run_bot(transport, runner_args, caller_number="", context=context)
+
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize WebRTC transport: {e}", exc_info=True)
+        await runner_args.websocket.close()
+
+    finally:
+        logger.info("🧹 Bot session ended. Connection closed.")
+
+        
+async def bot2(runner_args: RunnerArguments):
     """Main bot entry point compatible with both Twilio and WebRTC."""
     logger.info("🚀 Starting Gemini bot (Twilio/WebRTC support)")
 

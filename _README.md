@@ -186,7 +186,7 @@ uv run pcc deploy
 ```
 
 ### Call your bot
-
+7860
 Call the Twilio number you set up earlier to speak with your bot! 🚀
 
 ## What's Next?

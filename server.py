@@ -6,6 +6,7 @@
 
 import argparse
 import os
+from typing import Any, Dict
 
 import uvicorn
 from dotenv import load_dotenv
@@ -13,9 +14,8 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import HTMLResponse
 from twilio.twiml.voice_response import Connect, Stream, VoiceResponse
-# from pipecat.transports.websocket.fastapi import FastAPIWebsocketTransport, FastAPIWebsocketParams
-
-
+from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from fastapi import FastAPI, WebSocket
 from pipecat.runner.types import WebSocketRunnerArguments
 from pipecat.transports.websocket.fastapi import (
@@ -130,19 +130,19 @@ async def start_call(request: Request):
     return HTMLResponse(content=twiml_content, media_type="application/xml")
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def twilio_websocket_endpoint(websocket: WebSocket):
     print("💡 Twilio attempting WebSocket connection...")
     await websocket.accept()
-    print("✅ WebSocket connection accepted for inbound call")
+    print("✅ Twilio WebSocket connection accepted for inbound call")
 
     try:
-        from bot import bot
+        from bot import run_bot
         from pipecat.runner.types import WebSocketRunnerArguments
 
         runner_args = WebSocketRunnerArguments(websocket=websocket)
         runner_args.handle_sigint = False
 
-        await bot(runner_args)
+        await bot_connect(runner_args)
 
     except Exception as e:
         import traceback
@@ -150,25 +150,38 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close()
 
 
+@app.post("/connect")
+async def bot_connect(request: Request) -> Dict[Any, Any]:
+    server_mode = os.getenv("WEBSOCKET_SERVER", "fast_api")
+    if server_mode == "websocket_server":
+        ws_url = "ws://localhost:8765"
+    else:
+        ws_url = "ws://localhost:7860/ws-browser"
+    return {"ws_url": ws_url}
+
+
+from pipecat.serializers.protobuf import ProtobufFrameSerializer
+
+
 @app.websocket("/ws-browser")
 async def websocket_browser(websocket: WebSocket):
+
+
     print("💡 Browser attempting WebSocket connection...")
-
-
+    print(f"Headers: {websocket.headers}")
+    print(f"Query params: {dict(websocket.query_params)}")
+    
+    # Add these lines before accept
+    origin = websocket.headers.get("origin", "")
+    print(f"Origin: {origin}")
 
      # Extract query parameters
     query_params = dict(websocket.query_params)
     branch = query_params.get("branch", "")
-    # type = query_params.get("type", "")
-    # phone = query_params.get("phone", "")
-    # language = query_params.get("language", "en")
     session = query_params.get("session", "")
     
     print(f"📱 Browser connection params:")
     print(f"   branch: {branch}")
-    # print(f"   type: {type}")
-    # print(f"   Phone: {phone}")
-    # print(f"   Language: {language}")
     print(f"   Session ID: {session}")
 
 
@@ -185,6 +198,18 @@ async def websocket_browser(websocket: WebSocket):
             params=FastAPIWebsocketParams(
                 audio_in_enabled=True,
                 audio_out_enabled=True,
+            ),
+        )
+
+        # Create FastAPI transport for Pipecat
+        transport = FastAPIWebsocketTransport(
+            websocket=websocket,
+            params=FastAPIWebsocketParams(
+                audio_in_enabled=True,
+                audio_out_enabled=True,
+                add_wav_header=False,
+                vad_analyzer=SileroVADAnalyzer(),
+                serializer=ProtobufFrameSerializer(),
             ),
         )
 
@@ -206,7 +231,6 @@ async def websocket_browser(websocket: WebSocket):
         import traceback
         print("❌ ERROR in browser WebSocket endpoint:\n", traceback.format_exc())
         await websocket.close()
-
 
 
 if __name__ == "__main__":

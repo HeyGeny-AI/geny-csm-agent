@@ -101,3 +101,6 @@ Built by the **Geny Labs** team — a global group developing AI assistants for 
 
 uv run bot.py 
 uv run server.py 
+
+
+python bot.py -t webrtc

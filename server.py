@@ -179,7 +179,9 @@ async def websocket_browser(websocket: WebSocket):
         import traceback
         print("❌ ERROR in browser WebSocket endpoint:\n", traceback.format_exc())
         await websocket.close()
-        
+
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pipecat Twilio Chatbot Server")
     parser.add_argument(

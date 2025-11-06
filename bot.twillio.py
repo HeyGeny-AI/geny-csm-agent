@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""Gemini Live + Twilio/WebRTC + NestJS MCP Booking Example (Unified Version)."""
+"""Gemini Live + Twilio + NestJS MCP Booking Example (Merged Version)."""
 
 import asyncio
 import os
@@ -28,14 +28,16 @@ from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.processors.transcript_processor import TranscriptProcessor
 from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
 from pipecat.runner.types import RunnerArguments
-from pipecat.runner.utils import parse_telephony_websocket, create_transport
+from pipecat.runner.utils import parse_telephony_websocket
 from pipecat.serializers.twilio import TwilioFrameSerializer
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketTransport, FastAPIWebsocketParams
-from pipecat.transports.base_transport import TransportParams
 
 load_dotenv(override=True)
+
+NUM_ROUNDS = 4
+
 
 # -------------------------------------------------------
 # NestJS MCP Client
@@ -106,12 +108,13 @@ def booking_handlers_factory(mcp_client: NestJSMCPClient, default_phone: str = "
     (NestJS MCP client + caller phone number).
     """
 
-    logger.info(f"📱 Caller number in booking_handlers_factory: {default_phone}")
+    logger.info(f"📱 Caller number detected inside booking_handlers_factory: {default_phone}")
 
     # ---------------------------------------------------
     # 1️⃣  MAKE BOOKING HANDLER
     # ---------------------------------------------------
     async def make_booking_handler(params: FunctionCallParams):
+        logger.info(f"📱 Caller number inside make_booking_handler: {default_phone}")
         arguments = params.arguments or {}
         logger.info(f"Received booking request: {arguments}")
 
@@ -126,7 +129,7 @@ def booking_handlers_factory(mcp_client: NestJSMCPClient, default_phone: str = "
             if not phone:
                 await params.result_callback({
                     "status": "missing_info",
-                    "message": "I don't have your phone number yet. Could you please provide it so I can complete your booking?"
+                    "message": "I don’t have your phone number yet. Could you please provide it so I can complete your booking?"
                 })
                 return
 
@@ -188,73 +191,86 @@ def booking_handlers_factory(mcp_client: NestJSMCPClient, default_phone: str = "
             })
 
     # ---------------------------------------------------
-    # 3️⃣  CANCEL BOOKINGS HANDLER
+    # 3️⃣  (OPTIONAL FUTURE EXTENSIONS)
     # ---------------------------------------------------
-    async def cancel_bookings_handler(params: FunctionCallParams):
-        arguments = params.arguments or {}
-        name = arguments.get("name", "")
-        if not name:
-            await params.result_callback({
-                "status": "error",
-                "message": "Customer name is required"
-            })
-            return
-
-        try:
-            result = await mcp_client.call_tool("cancel_bookings", {"name": name})
-            msg = result.get("content", [{}])[0].get("text", "Booking cancelled successfully.")
-
-            await params.result_callback({
-                "status": "success",
-                "message": msg
-            })
-
-        except Exception as e:
-            logger.error(f"Failed to cancel booking: {e}")
-            await params.result_callback({
-                "status": "error",
-                "message": str(e)
-            })
-
-    # ---------------------------------------------------
-    # 4️⃣  GET SERVICES HANDLER
-    # ---------------------------------------------------
-    async def get_services_handler(params: FunctionCallParams):
-        arguments = params.arguments or {}
-        name = arguments.get("name", "")
-
-        try:
-            result = await mcp_client.call_tool("get_services", {"name": name})
-            msg = result.get("content", [{}])[0].get("text", "No services found.")
-
-            await params.result_callback({
-                "status": "success",
-                "services": msg
-            })
-
-        except Exception as e:
-            logger.error(f"Failed to get services: {e}")
-            await params.result_callback({
-                "status": "error",
-                "message": str(e)
-            })
+    # async def cancel_booking_handler(...)
+    # async def get_services_handler(...)
 
     # Return all handlers together
     return {
         "make_booking": make_booking_handler,
         "get_bookings": get_bookings_handler,
-        "cancel_bookings": cancel_bookings_handler,
-        "get_services": get_services_handler,
     }
 
 
+
+# def booking_handlers_factory(mcp_client: NestJSMCPClient, default_phone: str = ""):
+#     logger.info(f"📱 Caller number detected in inside make_booking_handler_factory : {default_phone}")
+
+#     async def make_booking_handler(params: FunctionCallParams):
+
+#         logger.info(f"📱 Caller number detected in inside make_booking_handler function : {default_phone}")
+#         arguments = params.arguments or {}
+#         logger.info(f"Received booking request: {arguments}")
+#         try:
+#             name = arguments.get("name")
+#             phone = arguments.get("phone") or default_phone
+#             service = arguments.get("service")
+#             date = arguments.get("date")
+#             time = arguments.get("time")
+
+#             # If default phone is missing, ask user for it conversationally
+#             if not phone:
+#                 await params.result_callback({
+#                     "status": "missing_info",
+#                     "message": "I don’t have your phone number yet. Could you please provide it so I can complete your booking?"
+#                 })
+#                 return
+            
+#             if not all([name, phone, service, date, time]):
+#                 raise ValueError("Missing required booking fields")
+
+#             datetime_str = f"{date} {time}"
+#             dt = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M")
+#             lagos_tz = pytz.timezone("Africa/Lagos")
+#             dt = lagos_tz.localize(dt)
+#             timestamp = int(dt.timestamp())
+
+#             result = await mcp_client.make_booking(name, phone, service, timestamp)
+#             msg = result.get("content", [{}])[0].get("text", "Booking created successfully.")
+#             await params.result_callback({"status": "success", "message": msg, "confirmation": result})
+#         except Exception as e:
+#             logger.error(f"Booking failed: {e}")
+#             await params.result_callback({"status": "error", "message": str(e)})
+#     return make_booking_handler
+
+
+# def get_bookings_handler_factory(mcp_client: NestJSMCPClient):
+#     async def get_bookings_handler(params: FunctionCallParams):
+#         arguments = params.arguments or {}
+#         name = arguments.get("name", "")
+#         if not name:
+#             await params.result_callback({"status": "error", "message": "Customer name is required"})
+#             return
+#         try:
+#             result = await mcp_client.get_bookings(name)
+#             msg = result.get("content", [{}])[0].get("text", "No bookings found.")
+#             await params.result_callback({"status": "success", "bookings": msg})
+#         except Exception as e:
+#             logger.error(f"Failed to get bookings: {e}")
+#             await params.result_callback({"status": "error", "message": str(e)})
+#     return get_bookings_handler
+
+
 # -------------------------------------------------------
-# Gemini + Multi-Transport Bot
+# Gemini + Twilio Bot
 # -------------------------------------------------------
 
-async def run_bot(transport, runner_args: RunnerArguments, caller_number: str = ""):
-    logger.info("🚀 Starting Gemini + Multi-Transport booking bot")
-    logger.info(f"📱 Caller number: {caller_number or 'Not provided'}")
+async def run_bot(transport: FastAPIWebsocketTransport, runner_args: RunnerArguments, caller_number: str = ""):
+    logger.info("🚀 Starting Gemini + Twilio booking bot")
+
+
+    logger.info(f"📱 Caller number detected in inside run_bot : {caller_number}")
 
     # Initialize MCP client
     mcp_client = NestJSMCPClient(
@@ -273,11 +289,11 @@ async def run_bot(transport, runner_args: RunnerArguments, caller_number: str = 
         name="make_booking",
         description="Create a new booking appointment.",
         properties={
-            "name": {"type": "string", "description": "Customer name"},
-            "phone": {"type": "string", "description": "Customer phone number"},
-            "service": {"type": "string", "description": "Service type"},
-            "date": {"type": "string", "description": "Date in YYYY-MM-DD format"},
-            "time": {"type": "string", "description": "Time in HH:MM 24-hour format"},
+            "name": {"type": "string"},
+            "phone": {"type": "string"},
+            "service": {"type": "string"},
+            "date": {"type": "string"},
+            "time": {"type": "string"},
         },
         required=["name", "service", "date", "time"],
     )
@@ -285,44 +301,36 @@ async def run_bot(transport, runner_args: RunnerArguments, caller_number: str = 
     get_bookings_function = FunctionSchema(
         name="get_bookings",
         description="Retrieve bookings by customer name.",
-        properties={"name": {"type": "string", "description": "Customer name"}},
+        properties={"name": {"type": "string"}},
         required=["name"],
     )
 
     cancel_bookings_function = FunctionSchema(
         name="cancel_bookings",
-        description="Cancel bookings by customer name.",
-        properties={"name": {"type": "string", "description": "Customer name"}},
+        description="cancel bookings by customer name.",
+        properties={"name": {"type": "string"}},
         required=["name"],
     )
 
+
     get_services_function = FunctionSchema(
         name="get_services",
-        description="Get available branch services and prices.",
-        properties={"name": {"type": "string", "description": "Branch or service category"}},
-        required=[],
+        description="get branch services and prices.",
+        properties={"name": {"type": "string"}},
+        required=["name"],
     )
 
-    tools = ToolsSchema(standard_tools=[
-        make_booking_function, 
-        get_bookings_function, 
-        cancel_bookings_function, 
-        get_services_function
-    ])
+    tools = ToolsSchema(standard_tools=[make_booking_function, get_bookings_function, cancel_bookings_function, get_services_function])
 
-    # System instructions for Gemini (context-aware of phone number)
-    phone_context = f"The caller's phone number is {caller_number}." if caller_number else "Ask for the caller's phone number if needed for booking."
-    
-    instructions = f"""
+    # System instructions for Gemini
+    instructions = """
 You are Geny, a friendly voice assistant who helps users book appointments or check their bookings.
 Always confirm details before making a booking.
 Use date format YYYY-MM-DD and time in 24-hour HH:MM.
 Be concise, polite, and natural in your voice responses.
-
-{phone_context}
 """
 
-    # Gemini LLM service
+    # Gemini LLM service (keeps your original Gemini config)
     llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
         model="models/gemini-2.5-flash-native-audio-preview-09-2025",
@@ -331,15 +339,17 @@ Be concise, polite, and natural in your voice responses.
         tools=tools,
     )
 
-    # Register handlers
     handlers = booking_handlers_factory(mcp_client, default_phone=caller_number)
+    # Register handlers
     llm.register_function("make_booking", handlers["make_booking"])
     llm.register_function("get_bookings", handlers["get_bookings"])
     llm.register_function("cancel_bookings", handlers["cancel_bookings"])
     llm.register_function("get_services", handlers["get_services"])
+    
 
     # Conversation context
     messages = [{"role": "user", "content": "Hi Geny, can you help me book a service?"}]
+   
     context = OpenAILLMContext(messages)
     context_aggregator = llm.create_context_aggregator(context)
     transcript = TranscriptProcessor()
@@ -366,7 +376,7 @@ Be concise, polite, and natural in your voice responses.
 
     @transport.event_handler("on_client_connected")
     async def on_connect(transport, client):
-        logger.info("📞 Client connected")
+        logger.info("📞 Client connected via Twilio")
         await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
@@ -389,79 +399,49 @@ Be concise, polite, and natural in your voice responses.
 
 
 # -------------------------------------------------------
-# Unified Transport Entry Point (Twilio + WebRTC)
+# Twilio Transport Entry Point
 # -------------------------------------------------------
 
 async def bot(runner_args: RunnerArguments):
-    """Main bot entry point compatible with both Twilio and WebRTC."""
-    logger.info("🚀 Starting Gemini bot (Twilio/WebRTC support)")
+
+    print("🚀 Starting Gemini + Twilio booking bot")
+
+    """Main bot entry point for Twilio audio calls (Gemini-powered)."""
+    transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
+    logger.info(f"📞 Detected Twilio transport: {transport_type}")
+
+    serializer = TwilioFrameSerializer(
+        stream_sid=call_data["stream_id"],
+        call_sid=call_data["call_id"],
+        account_sid=os.getenv("TWILIO_ACCOUNT_SID", ""),
+        auth_token=os.getenv("TWILIO_AUTH_TOKEN", ""),
+    )
 
     # Optional noise filter
     if os.environ.get("ENV") != "local":
-        try:
-            from pipecat.audio.filters.krisp_filter import KrispFilter
-            krisp_filter = KrispFilter()
-            logger.info("✅ Krisp noise filter enabled")
-        except ImportError:
-            logger.warning("⚠️ Krisp filter not available, continuing without it")
-            krisp_filter = None
+        from pipecat.audio.filters.krisp_filter import KrispFilter
+        krisp_filter = KrispFilter()
     else:
         krisp_filter = None
 
-    caller_number = ""
-
-    # Try to detect Twilio transport first
-    try:
-        transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
-        logger.info(f"📞 Detected transport type: {transport_type}")
-
-        if transport_type == "twilio":
-            # Extract caller phone number from Twilio
-            caller_number = call_data.get("body", {}).get("from", "")
-            logger.info(f"📱 Twilio caller number: {caller_number}")
-
-            # Create Twilio-specific serializer
-            serializer = TwilioFrameSerializer(
-                stream_sid=call_data["stream_id"],
-                call_sid=call_data["call_id"],
-                account_sid=os.getenv("TWILIO_ACCOUNT_SID", ""),
-                auth_token=os.getenv("TWILIO_AUTH_TOKEN", ""),
-            )
-
-            transport = FastAPIWebsocketTransport(
-                websocket=runner_args.websocket,
-                params=FastAPIWebsocketParams(
-                    audio_in_enabled=True,
-                    audio_out_enabled=True,
-                    add_wav_header=False,  # Twilio expects raw PCM16
-                    audio_in_filter=krisp_filter,
-                    vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.5)),
-                    serializer=serializer,
-                ),
-            )
-
-            await run_bot(transport, runner_args, caller_number)
-            return
-
-    except Exception as e:
-        logger.info(f"ℹ️ Not a Twilio connection, trying WebRTC: {e}")
-
-    # If not Twilio, use WebRTC transport
-    logger.info("🌐 Using WebRTC transport")
-    
-    transport_params = {
-        "webrtc": lambda: TransportParams(
+    transport = FastAPIWebsocketTransport(
+        websocket=runner_args.websocket,
+        params=FastAPIWebsocketParams(
             audio_in_enabled=True,
-            audio_in_filter=krisp_filter,
             audio_out_enabled=True,
+            add_wav_header=False,  # Twilio expects raw PCM16
+            audio_in_filter=krisp_filter,
             vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.5)),
+            serializer=serializer,
         ),
-    }
+    )
 
-    transport = await create_transport(runner_args, transport_params)
-    
-    # For WebRTC, caller_number remains empty (will ask user)
-    await run_bot(transport, runner_args, caller_number="")
+  
+    caller_number = call_data.get("body", {}).get("from", "")
+
+    logger.info(f"📱 Caller number detected in bot.py: {caller_number}")
+
+    await run_bot(transport, runner_args, caller_number)
 
 
 # -------------------------------------------------------

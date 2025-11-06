@@ -252,7 +252,7 @@ def booking_handlers_factory(mcp_client: NestJSMCPClient, default_phone: str = "
 # Gemini + Multi-Transport Bot
 # -------------------------------------------------------
 
-async def run_bot(transport, runner_args: RunnerArguments, caller_number: str = ""):
+async def run_bot(transport, runner_args: RunnerArguments, caller_number: str = "",  context: dict = None):
     logger.info("🚀 Starting Gemini + Multi-Transport booking bot")
     logger.info(f"📱 Caller number: {caller_number or 'Not provided'}")
 
@@ -396,6 +396,8 @@ async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with both Twilio and WebRTC."""
     logger.info("🚀 Starting Gemini bot (Twilio/WebRTC support)")
 
+    
+
     # Optional noise filter
     if os.environ.get("ENV") != "local":
         try:
@@ -418,6 +420,7 @@ async def bot(runner_args: RunnerArguments):
         if transport_type == "twilio":
             # Extract caller phone number from Twilio
             caller_number = call_data.get("body", {}).get("from", "")
+            to_number = call_data.get("body", {}).get("to", "")
             logger.info(f"📱 Twilio caller number: {caller_number}")
 
             # Create Twilio-specific serializer
@@ -440,7 +443,26 @@ async def bot(runner_args: RunnerArguments):
                 ),
             )
 
-            await run_bot(transport, runner_args, caller_number)
+            context={
+                "type": "customer",
+                "channel": "twilio",
+                "branch": "123456",
+                "language": "en",
+                "session": "1234",
+                "call_info" : {
+                    "caller" : caller_number,
+                    "receipient" : to_number,
+                    "call_sid" : call_data["call_id"],
+                    "stream_sid" : call_data["stream_id"],
+                    "account_sid" : os.getenv("TWILIO_ACCOUNT_SID", "")
+                }
+            }
+
+
+            if context:
+                logger.info(f"👤 Received user context: {context}")
+           
+            await run_bot(transport, runner_args, caller_number, context)
             return
 
     except Exception as e:
@@ -459,9 +481,20 @@ async def bot(runner_args: RunnerArguments):
     }
 
     transport = await create_transport(runner_args, transport_params)
+
+    context={
+        "branch": "123456",
+        "type": "business",
+        "channel": "webrtc",
+        "language": "en",
+        "session": "1234",
+    }
+    print(">>>>>>>>>>>><<<<<<<<<<<<")
+    print(context)
+    print(">>>>>>>>>>>><<<<<<<<<<<<")
     
     # For WebRTC, caller_number remains empty (will ask user)
-    await run_bot(transport, runner_args, caller_number="")
+    await run_bot(transport, runner_args, caller_number="", context=context)
 
 
 # -------------------------------------------------------

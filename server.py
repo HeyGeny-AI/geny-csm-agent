@@ -153,6 +153,25 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.websocket("/ws-browser")
 async def websocket_browser(websocket: WebSocket):
     print("💡 Browser attempting WebSocket connection...")
+
+
+
+     # Extract query parameters
+    query_params = dict(websocket.query_params)
+    branch = query_params.get("branch", "")
+    # type = query_params.get("type", "")
+    # phone = query_params.get("phone", "")
+    # language = query_params.get("language", "en")
+    session = query_params.get("session", "")
+    
+    print(f"📱 Browser connection params:")
+    print(f"   branch: {branch}")
+    # print(f"   type: {type}")
+    # print(f"   Phone: {phone}")
+    # print(f"   Language: {language}")
+    print(f"   Session ID: {session}")
+
+
     await websocket.accept()
     print("✅ WebSocket connection accepted for browser client")
 
@@ -173,6 +192,14 @@ async def websocket_browser(websocket: WebSocket):
             transport=transport,
             runner_args=runner_args,
             caller_number="browser-user",
+            context={
+                "branch": branch,
+                "type": "business",
+                "channel": "webrtc",
+                # "phone": "",
+                "language": "en",
+                "session": session,
+            }
         )
 
     except Exception as e:

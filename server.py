@@ -159,7 +159,7 @@ async def bot_connect(request: Request) -> Dict[Any, Any]:
         
     else:
         # ws_url = "ws://localhost:7860/ws-browser"
-        ws_url = "ws://pipecat.server.heygeny.com/ws-browser"
+        ws_url = "wss://pipecat.server.heygeny.com/ws-browser"
     return {"ws_url": ws_url}
 
 

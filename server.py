@@ -154,13 +154,17 @@ async def twilio_websocket_endpoint(websocket: WebSocket):
 async def bot_connect(request: Request) -> Dict[Any, Any]:
     server_mode = os.getenv("WEBSOCKET_SERVER", "fast_api")
     if server_mode == "websocket_server":
-        ws_url = "ws://localhost:8765"
+        # ws_url = "ws://localhost:8765"
+        ws_url = "wss://pipecat.server.heygeny.com"
+        
     else:
-        ws_url = "ws://localhost:7860/ws-browser"
+        # ws_url = "ws://localhost:7860/ws-browser"
+        ws_url = "ws://pipecat.server.heygeny.com/ws-browser"
     return {"ws_url": ws_url}
 
 
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
+
 
 
 @app.websocket("/ws-browser")

@@ -383,7 +383,7 @@ Be concise, polite, and natural in your voice responses.
     @transport.event_handler("on_client_connected")
     async def on_connect(transport, client):
         logger.info("📞 Client connected")
-        await task.queue_frames([LLMRunFrame("")])
+        await task.queue_frames([LLMRunFrame()])
        
 
     @transport.event_handler("on_client_disconnected")

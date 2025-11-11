@@ -383,7 +383,14 @@ Be concise, polite, and natural in your voice responses.
     @transport.event_handler("on_client_connected")
     async def on_connect(transport, client):
         logger.info("📞 Client connected")
-        await task.queue_frames([LLMRunFrame()])
+        # await task.queue_frames([LLMRunFrame()])
+
+
+        # Immediately greet the caller
+        greeting_text = "Hi! You’ve reached Sailing Winds Beauty & Wellness. I’m with a client but Geny can help you book your services."
+
+        # Queue a frame for the LLM to speak
+        await task.queue_frames([LLMRunFrame(user_message=greeting_text)])
        
 
     @transport.event_handler("on_client_disconnected")

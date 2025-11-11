@@ -328,7 +328,7 @@ Be concise, polite, and natural in your voice responses.
     llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
         model="models/gemini-2.5-flash-native-audio-preview-09-2025",
-        voice_id="Charon", # Puck, Charon, Fenrir,Kore, Aoede
+        voice_id="Kore", # Puck, Charon, Fenrir,Kore, Aoede
         system_instruction=instructions,
         tools=tools,
     )
@@ -342,24 +342,10 @@ Be concise, polite, and natural in your voice responses.
 
     # Conversation context
     # messages = [{"role": "user", "content": "Hi Geny, can you help me book a service?"}]
-    # messages = [
-    #     {
-    #         "role": "system",
-    #         "content": "You are Geny, a friendly voice assistant who helps users book appointments or check their bookings. Always confirm details before making a booking. Use date format YYYY-MM-DD and time in 24-hour HH:MM. Be concise, polite, and natural in your voice responses.",
-    #     },
-    #     {
-    #         "role": "user",
-    #         "content": "Geny, please greet the caller and introduce yourself from Sailing Winds Beauty & Wellness.",
-    #     },
-    #     {
-    #         "role": "assistant",
-    #         "content": "Hi! You’ve reached Sailing Winds Beauty & Wellness. I’m with a client but Geny can help you book your services",
-    #     },
-    # ]
     messages = [
         {
             "role": "user",
-            "content": "Please greet the caller with: 'Hi! You've reached Sailing Winds Beauty & Wellness. I'm with a client but Geny can help you book your services.' Then ask how you can help them.",
+            "content": "Please greet the caller with: 'Hi! You've reached Sailing Winds Beauty & Wellness. I'm with a client but Geny can help you book your services.' Then ask how you can help them. the greetings should be in a friendly tone",
         },
     ]
     context = OpenAILLMContext(messages)

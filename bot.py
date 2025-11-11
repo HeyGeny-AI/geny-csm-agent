@@ -348,6 +348,10 @@ Be concise, polite, and natural in your voice responses.
             "content": "You are Geny, a friendly voice assistant who helps users book appointments or check their bookings. Always confirm details before making a booking. Use date format YYYY-MM-DD and time in 24-hour HH:MM. Be concise, polite, and natural in your voice responses.",
         },
         {
+            "role": "user",
+            "content": "Geny, please greet the caller and introduce yourself from Sailing Winds Beauty & Wellness.",
+        },
+        {
             "role": "assistant",
             "content": "Hi! You’ve reached Sailing Winds Beauty & Wellness. I’m with a client but Geny can help you book your services",
         },
@@ -379,10 +383,8 @@ Be concise, polite, and natural in your voice responses.
     @transport.event_handler("on_client_connected")
     async def on_connect(transport, client):
         logger.info("📞 Client connected")
-        # await task.queue_frames([LLMRunFrame("")])
-        await task.queue_frames([
-            LLMRunFrame(prompt="Please greet the user and introduce yourself."),
-        ])
+        await task.queue_frames([LLMRunFrame("")])
+       
 
     @transport.event_handler("on_client_disconnected")
     async def on_disconnect(transport, client):

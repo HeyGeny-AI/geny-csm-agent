@@ -328,7 +328,7 @@ Be concise, polite, and natural in your voice responses.
     llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
         model="models/gemini-2.5-flash-native-audio-preview-09-2025",
-        voice_id="Kore", # Puck, Charon, Fenrir,Kore, Aoede
+        voice_id="Aoede", # Puck, Charon, Fenrir,Kore, Aoede
         system_instruction=instructions,
         tools=tools,
     )

@@ -124,6 +124,14 @@ def booking_handlers_factory(mcp_client: NestJSMCPClient, default_phone: str = "
             date = arguments.get("date")
             time = arguments.get("time")
 
+            # Require a real name — do NOT allow defaults like "User"
+            if not name or name.lower() == "user":
+                await params.result_callback({
+                    "status": "missing_info",
+                    "message": "I don't have your name yet. What name should I use for the booking?"
+                })
+                return
+
             # Ask user for phone if missing
             if not phone:
                 await params.result_callback({
@@ -321,6 +329,12 @@ Always confirm details before making a booking.
 Use date format YYYY-MM-DD and time in 24-hour HH:MM.
 Be concise, polite, and natural in your voice responses.
 
+IMPORTANT RULES ABOUT CUSTOMER NAME:
+- Never assume the caller’s name.
+- Never use a placeholder like “User”, “Guest”, or any inferred name.
+- If the name is not explicitly provided by the caller, ALWAYS ask: 
+  “May I have your name, please?”
+- Do not proceed with a booking or lookup until the caller provides their name.
 {phone_context}
 """
 

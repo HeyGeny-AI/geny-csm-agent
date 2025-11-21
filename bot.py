@@ -34,228 +34,11 @@ from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketTransport, FastAPIWebsocketParams
 from pipecat.transports.base_transport import TransportParams
-
-
+from mcp_client import NestJSMCPClient
+from handlers.client_handler import ClientHandlers
 
 load_dotenv(override=True)
 
-# -------------------------------------------------------
-# NestJS MCP Client
-# -------------------------------------------------------
-
-class NestJSMCPClient:
-    """HTTP client for NestJS MCP server."""
-    
-    def __init__(self, base_url: str, api_key: str = ""):
-        self.base_url = base_url.rstrip("/")
-        self.api_key = api_key
-        self.session: Optional[aiohttp.ClientSession] = None
-    
-    def _get_headers(self) -> Dict[str, str]:
-        headers = {"Content-Type": "application/json"}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-        return headers
-    
-    async def _ensure_session(self):
-        if self.session is None or self.session.closed:
-            self.session = aiohttp.ClientSession()
-    
-    async def close(self):
-        if self.session and not self.session.closed:
-            await self.session.close()
-    
-    async def health_check(self) -> Dict[str, Any]:
-        await self._ensure_session()
-        url = f"{self.base_url}/mcp/health"
-        async with self.session.get(url, headers=self._get_headers()) as resp:
-            resp.raise_for_status()
-            return await resp.json()
-    
-    async def list_tools(self) -> Dict[str, Any]:
-        await self._ensure_session()
-        url = f"{self.base_url}/mcp/tools"
-        async with self.session.get(url, headers=self._get_headers()) as resp:
-            resp.raise_for_status()
-            return await resp.json()
-    
-    async def call_tool(self, tool_name: str, args: Dict[str, Any]) -> Dict[str, Any]:
-        await self._ensure_session()
-        url = f"{self.base_url}/mcp/call-tool"
-        payload = {"name": tool_name, "args": args}
-        async with self.session.post(url, json=payload, headers=self._get_headers()) as resp:
-            resp.raise_for_status()
-            return await resp.json()
-    
-    async def make_booking(self, name: str, phone: str, service: str, timestamp: int) -> Dict[str, Any]:
-        args = {"name": name, "phone": phone, "service": service, "timestamp": timestamp}
-        logger.info(f"Making booking: {args}")
-        return await self.call_tool("make_booking", args)
-    
-    async def get_bookings(self, name: str) -> Dict[str, Any]:
-        args = {"name": name}
-        logger.info(f"Getting bookings for: {name}")
-        return await self.call_tool("get_bookings", args)
-
-
-# -------------------------------------------------------
-# Booking Handlers
-# -------------------------------------------------------
-
-def booking_handlers_factory(mcp_client: NestJSMCPClient, default_phone: str = ""):
-    """
-    Creates all booking-related async handler functions with shared context
-    (NestJS MCP client + caller phone number).
-    """
-
-    logger.info(f"📱 Caller number in booking_handlers_factory: {default_phone}")
-
-    # ---------------------------------------------------
-    # 1️⃣  MAKE BOOKING HANDLER
-    # ---------------------------------------------------
-    async def make_booking_handler(params: FunctionCallParams):
-        arguments = params.arguments or {}
-        logger.info(f"Received booking request: {arguments}")
-
-        try:
-            name = arguments.get("name")
-            phone = arguments.get("phone") or default_phone
-            service = arguments.get("service")
-            date = arguments.get("date")
-            time = arguments.get("time")
-
-            # Require a real name — do NOT allow defaults like "User"
-            if not name or name.lower() == "user":
-                await params.result_callback({
-                    "status": "missing_info",
-                    "message": "I don't have your name yet. What name should I use for the booking?"
-                })
-                return
-
-            # Ask user for phone if missing
-            if not phone:
-                await params.result_callback({
-                    "status": "missing_info",
-                    "message": "I don't have your phone number yet. Could you please provide it so I can complete your booking?"
-                })
-                return
-
-            # Validate inputs
-            if not all([name, phone, service, date, time]):
-                raise ValueError("Missing required booking fields")
-
-            # Convert date/time → timestamp
-            datetime_str = f"{date} {time}"
-            dt = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M")
-            lagos_tz = pytz.timezone("Africa/Lagos")
-            dt = lagos_tz.localize(dt)
-            timestamp = int(dt.timestamp())
-
-            # Call NestJS MCP booking endpoint
-            result = await mcp_client.make_booking(name, phone, service, timestamp)
-            msg = result.get("content", [{}])[0].get("text", "Booking created successfully.")
-
-            await params.result_callback({
-                "status": "success",
-                "message": msg,
-                "confirmation": result
-            })
-
-        except Exception as e:
-            logger.error(f"Booking failed: {e}")
-            await params.result_callback({
-                "status": "error",
-                "message": str(e)
-            })
-
-    # ---------------------------------------------------
-    # 2️⃣  GET BOOKINGS HANDLER
-    # ---------------------------------------------------
-    async def get_bookings_handler(params: FunctionCallParams):
-        arguments = params.arguments or {}
-        name = arguments.get("name", "")
-        if not name:
-            await params.result_callback({
-                "status": "error",
-                "message": "Customer name is required"
-            })
-            return
-
-        try:
-            result = await mcp_client.get_bookings(name)
-            msg = result.get("content", [{}])[0].get("text", "No bookings found.")
-
-            await params.result_callback({
-                "status": "success",
-                "bookings": msg
-            })
-
-        except Exception as e:
-            logger.error(f"Failed to get bookings: {e}")
-            await params.result_callback({
-                "status": "error",
-                "message": str(e)
-            })
-
-    # ---------------------------------------------------
-    # 3️⃣  CANCEL BOOKINGS HANDLER
-    # ---------------------------------------------------
-    async def cancel_bookings_handler(params: FunctionCallParams):
-        arguments = params.arguments or {}
-        name = arguments.get("name", "")
-        if not name:
-            await params.result_callback({
-                "status": "error",
-                "message": "Customer name is required"
-            })
-            return
-
-        try:
-            result = await mcp_client.call_tool("cancel_bookings", {"name": name})
-            msg = result.get("content", [{}])[0].get("text", "Booking cancelled successfully.")
-
-            await params.result_callback({
-                "status": "success",
-                "message": msg
-            })
-
-        except Exception as e:
-            logger.error(f"Failed to cancel booking: {e}")
-            await params.result_callback({
-                "status": "error",
-                "message": str(e)
-            })
-
-    # ---------------------------------------------------
-    # 4️⃣  GET SERVICES HANDLER
-    # ---------------------------------------------------
-    async def get_services_handler(params: FunctionCallParams):
-        arguments = params.arguments or {}
-        name = arguments.get("name", "")
-
-        try:
-            result = await mcp_client.call_tool("get_services", {"name": name})
-            msg = result.get("content", [{}])[0].get("text", "No services found.")
-
-            await params.result_callback({
-                "status": "success",
-                "services": msg
-            })
-
-        except Exception as e:
-            logger.error(f"Failed to get services: {e}")
-            await params.result_callback({
-                "status": "error",
-                "message": str(e)
-            })
-
-    # Return all handlers together
-    return {
-        "make_booking": make_booking_handler,
-        "get_bookings": get_bookings_handler,
-        "cancel_bookings": cancel_bookings_handler,
-        "get_services": get_services_handler,
-    }
 
 
 # -------------------------------------------------------
@@ -278,81 +61,46 @@ async def run_bot(transport, runner_args: RunnerArguments, caller_number: str = 
     except Exception as e:
         logger.warning(f"⚠️ MCP connection failed: {e}")
 
-    # Define Gemini functions
-    make_booking_function = FunctionSchema(
-        name="make_booking",
-        description="Create a new booking appointment.",
-        properties={
-            "name": {"type": "string", "description": "Customer name"},
-            "phone": {"type": "string", "description": "Customer phone number"},
-            "service": {"type": "string", "description": "Service type"},
-            "date": {"type": "string", "description": "Date in YYYY-MM-DD format"},
-            "time": {"type": "string", "description": "Time in HH:MM 24-hour format"},
-        },
-        required=["name", "service", "date", "time"],
-    )
+    llm = None
 
-    get_bookings_function = FunctionSchema(
-        name="get_bookings",
-        description="Retrieve bookings by customer name.",
-        properties={"name": {"type": "string", "description": "Customer name"}},
-        required=["name"],
-    )
+    value = "x"
+    match value:
+        case "client-web":
+            print("1")
+        case "client-call":
+            handlers = ClientHandlers(mcp_client, default_phone=caller_number)
 
-    cancel_bookings_function = FunctionSchema(
-        name="cancel_bookings",
-        description="Cancel bookings by customer name.",
-        properties={"name": {"type": "string", "description": "Customer name"}},
-        required=["name"],
-    )
+            # get branch information from phone
+            # get buisiness information from branch
 
-    get_services_function = FunctionSchema(
-        name="get_services",
-        description="Get available branch services and prices.",
-        properties={"name": {"type": "string", "description": "Branch or service category"}},
-        required=[],
-    )
+            # check if phone number is registered from client,
+            # if not, create account by asking for 1. first name, last name, country code, phone, whatsapp 
+            # use the information to create an account.
+            # if account is found, use the reference to make transactions
+            print("2")
 
-    tools = ToolsSchema(standard_tools=[
-        make_booking_function, 
-        get_bookings_function, 
-        cancel_bookings_function, 
-        get_services_function
-    ])
+            # Gemini LLM service
+            llm = GeminiLiveLLMService(
+                api_key=os.getenv("GOOGLE_API_KEY"),
+                model="models/gemini-2.5-flash-native-audio-preview-09-2025",
+                voice_id="Aoede", # Puck, Charon, Fenrir,Kore, Aoede
+                system_instruction=handlers.get_instructions(),
+                tools=handlers.tools
+            )
 
-    # System instructions for Gemini (context-aware of phone number)
-    phone_context = f"The caller's phone number is {caller_number}." if caller_number else "Ask for the caller's phone number if needed for booking."
+            # Register handlers
+            llm.register_function("make_booking", handlers.make_booking)
+            llm.register_function("get_bookings", handlers.get_bookings)
+            llm.register_function("cancel_bookings", handlers.cancel_bookings)
+            llm.register_function("get_services", handlers.get_services)
+
+        case "business":
+            print("2")
+        case _:
+            print("unknown")
+
+
     
-    instructions = f"""
-You are Geny, a friendly voice assistant who helps users book appointments or check their bookings.
-Always confirm details before making a booking.
-Use date format YYYY-MM-DD and time in 24-hour HH:MM.
-Be concise, polite, and natural in your voice responses.
-
-IMPORTANT RULES ABOUT CUSTOMER NAME:
-- Never assume the caller’s name.
-- Never use a placeholder like “User”, “Guest”, or any inferred name.
-- If the name is not explicitly provided by the caller, ALWAYS ask: 
-  “May I have your name, please?”
-- Do not proceed with a booking or lookup until the caller provides their name.
-{phone_context}
-"""
-
-    # Gemini LLM service
-    llm = GeminiLiveLLMService(
-        api_key=os.getenv("GOOGLE_API_KEY"),
-        model="models/gemini-2.5-flash-native-audio-preview-09-2025",
-        voice_id="Aoede", # Puck, Charon, Fenrir,Kore, Aoede
-        system_instruction=instructions,
-        tools=tools,
-    )
-
-    # Register handlers
-    handlers = booking_handlers_factory(mcp_client, default_phone=caller_number)
-    llm.register_function("make_booking", handlers["make_booking"])
-    llm.register_function("get_bookings", handlers["get_bookings"])
-    llm.register_function("cancel_bookings", handlers["cancel_bookings"])
-    llm.register_function("get_services", handlers["get_services"])
 
     # Conversation context
     # messages = [{"role": "user", "content": "Hi Geny, can you help me book a service?"}]
@@ -484,7 +232,21 @@ async def bot(runner_args: RunnerArguments):
                 ),
             )
 
+
             context = {
+                "type": "client",
+                "channel" : "call",
+                "session": "",
+                "metadata": {
+                    "caller": caller_number,
+                    "recipient": to_number,
+                    "call_sid": call_data["call_id"],
+                    "stream_sid": call_data["stream_id"],
+                    "account_sid": os.getenv("TWILIO_ACCOUNT_SID", ""),
+                }
+            }
+
+            contextx = {
                 "type": "customer",
                 "channel": "twilio",
                 "branch": "123456",

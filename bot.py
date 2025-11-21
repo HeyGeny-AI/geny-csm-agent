@@ -36,6 +36,7 @@ from pipecat.transports.websocket.fastapi import FastAPIWebsocketTransport, Fast
 from pipecat.transports.base_transport import TransportParams
 from mcp_client import NestJSMCPClient
 from handlers.client_handler import ClientHandlers
+from pipecat.serializers.protobuf import ProtobufFrameSerializer
 
 load_dotenv(override=True)
 

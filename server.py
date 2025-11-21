@@ -23,6 +23,7 @@ from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
 )
 from bot import run_bot
+from pipecat.serializers.protobuf import ProtobufFrameSerializer
 
 # Load environment variables from .env file
 load_dotenv()
@@ -172,7 +173,6 @@ async def bot_connect(request: Request) -> Dict[Any, Any]:
     return {"ws_url": ws_url}
 
 
-from pipecat.serializers.protobuf import ProtobufFrameSerializer
 
 
 

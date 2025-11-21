@@ -64,7 +64,7 @@ async def run_bot(transport, runner_args: RunnerArguments, caller_number: str = 
 
     llm = None
 
-    value = "x"
+    value = context['type']
     match value:
         case "client-web":
             print("1")
@@ -235,9 +235,10 @@ async def bot(runner_args: RunnerArguments):
 
 
             context = {
-                "type": "client",
+                "type": "client-call",
                 "channel" : "call",
                 "session": "",
+                "language": "en",
                 "metadata": {
                     "caller": caller_number,
                     "recipient": to_number,
@@ -245,21 +246,6 @@ async def bot(runner_args: RunnerArguments):
                     "stream_sid": call_data["stream_id"],
                     "account_sid": os.getenv("TWILIO_ACCOUNT_SID", ""),
                 }
-            }
-
-            contextx = {
-                "type": "customer",
-                "channel": "twilio",
-                "branch": "123456",
-                "language": "en",
-                "session": "1234",
-                "call_info": {
-                    "caller": caller_number,
-                    "recipient": to_number,
-                    "call_sid": call_data["call_id"],
-                    "stream_sid": call_data["stream_id"],
-                    "account_sid": os.getenv("TWILIO_ACCOUNT_SID", ""),
-                },
             }
 
             logger.info(f"👤 Twilio context: {context}")

@@ -314,20 +314,6 @@ async def bot(runner_args: RunnerArguments):
 
             print(">>>>>>>>>  x5")
 
-            # meta2 = {
-            #     "type": "client",
-            #     "channel" : "call",
-            #     "session": "",
-            #     "language": "en",
-            #     "metadata": {
-            #         "caller": "+2348137583193",
-            #         "recipient": "+14784005765",
-            #         "call_sid": "123456",
-            #         "stream_sid": "24567899",
-            #         "account_sid": os.getenv("TWILIO_ACCOUNT_SID", ""),
-            #     }
-            # }
-
             meta = {
                 "type": "client",
                 "channel" : "call",
@@ -347,9 +333,17 @@ async def bot(runner_args: RunnerArguments):
             logger.info(f"👤 Twilio context: {meta}")
 
             print(">>>>>>>>>  x7")
-            await run_bot(transport, runner_args, meta)
-            print(">>>>>>>>>  x8")
+            # await run_bot(transport, runner_args, meta)
+            @transport.event_handler("on_client_connected")
+            async def _start(transport, client):
+                print("🔥 Twilio connected — starting bot")
+                await run_bot(transport, runner_args, meta)
+
             return
+
+
+            # print(">>>>>>>>>  x8")
+            # return
 
     except Exception as e:
         logger.info(f"ℹ️ Not a Twilio connection, falling back to WebRTC: {e}")

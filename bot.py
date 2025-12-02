@@ -338,40 +338,44 @@ async def bot(runner_args: RunnerArguments):
     # ─────────────────────────────
     # WebRTC fallback
     # ─────────────────────────────
-    try:
-        logger.info("🌐 Using WebRTC transport")
+    # try:
+    #     logger.info("🌐 Using WebRTC transport")
 
-        # Manually build transport (since create_transport doesn't accept force_type)
-        params = TransportParams(
-            audio_in_enabled=True,
-            audio_in_filter=krisp_filter,
-            audio_out_enabled=True,
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.5)),
-            serializer=ProtobufFrameSerializer(),  # 
-        )
 
-        transport = FastAPIWebsocketTransport(
-            websocket=runner_args.websocket,
-            params=FastAPIWebsocketParams(**params.__dict__)
-        )
+        
 
-        meta = {
-            "branch": "123456",
-            "type": "business",
-            "channel": "webrtc",
-            "language": "en",
-            "session": "1234",
-        }
+    #     # Manually build transport (since create_transport doesn't accept force_type)
+    #     params = TransportParams(
+    #         audio_in_enabled=True,
+    #         audio_in_filter=krisp_filter,
+    #         audio_out_enabled=True,
+    #         vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.5)),
+    #         serializer=ProtobufFrameSerializer(),  # 
+    #     )
 
-        logger.info(f"👤 WebRTC context: {meta}")
-        await run_bot(transport, runner_args, meta=meta)
+    #     transport = FastAPIWebsocketTransport(
+    #         websocket=runner_args.websocket,
+    #         params=FastAPIWebsocketParams(**params.__dict__)
+    #     )
 
-    except Exception as e:
-        logger.error(f"❌ Failed to initialize WebRTC transport: {e}", exc_info=True)
-        await runner_args.websocket.close()
+    #     meta = {
+    #         "branch": "123456",
+    #         "type": "business",
+    #         "channel": "webrtc",
+    #         "language": "en",
+    #         "session": "",
+    #         "metadata" : {}
+    #     }
 
-    finally:
-        logger.info("🧹 Bot session ended. Connection closed.")
+    #     logger.info(f"👤 WebRTC context: {meta}")
+    #     await run_bot(transport, runner_args, meta=meta)
+
+    # except Exception as e:
+    #     logger.error(f"❌ Failed to initialize WebRTC transport: {e}", exc_info=True)
+    #     await runner_args.websocket.close()
+
+    # finally:
+    #     logger.info("🧹 Bot session ended. Connection closed.")
 
         
 

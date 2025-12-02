@@ -42,13 +42,12 @@ load_dotenv(override=True)
 
 
 
+
 # -------------------------------------------------------
 # Gemini + Multi-Transport Bot
 # -------------------------------------------------------
-
-async def run_bot(transport, runner_args: RunnerArguments, caller_number: str = "",  context: dict = None):
+async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
     logger.info("🚀 Starting Gemini + Multi-Transport booking bot")
-    logger.info(f"📱 Caller number: {caller_number or 'Not provided'}")
 
     # Initialize MCP client
     mcp_client = NestJSMCPClient(
@@ -62,63 +61,141 @@ async def run_bot(transport, runner_args: RunnerArguments, caller_number: str = 
     except Exception as e:
         logger.warning(f"⚠️ MCP connection failed: {e}")
 
-    llm = None
+    # Initialize Gemini LLM
+    llm = GeminiLiveLLMService(
+        api_key=os.getenv("GOOGLE_API_KEY"),
+        model="models/gemini-2.5-flash-native-audio-preview-09-2025",
+        voice_id="Aoede",
+        system_instruction="",
+        tools=[]
+    )
 
-    value = context['type']
-    match value:
-        case "client-web":
-            print("1")
-        case "client-call":
-            handlers = ClientHandlers(mcp_client, default_phone=caller_number)
+    messages = []
+    handlers = ClientHandlers(mcp_client, meta=meta)
 
-            # get branch information from phone
-            # get buisiness information from branch
+    # ============================================
+    # CLIENT CALL HANDLING
+    # ============================================
+    if meta['type'] == "client":
+        # Fetch business by phone
+        branch = await handlers.fetch_business_by_phone(meta['metadata']['recipient'])
+        business_name = branch['business']['name']
+        branch_reference = branch['branch']['reference']
+        meta["branch_reference"] = branch_reference
 
-            # check if phone number is registered from client,
-            # if not, create account by asking for 1. first name, last name, country code, phone, whatsapp 
-            # use the information to create an account.
-            # if account is found, use the reference to make transactions
-            print("2")
+        # Check if client is already registered
+        caller_phone = meta['metadata']['caller']
+        client = await handlers.mcp_client.get_client_by_phone(caller_phone)
+        client_data = client.get("content", {}).get("data", {})
+        
+        if client_data:
+            meta["is_client_registered"] = True
+            meta["client"] = client_data
+            handlers.meta["client"] = client_data
+            handlers.meta["is_client_registered"] = True
+        else:
+            meta["is_client_registered"] = False
+            handlers.meta["is_client_registered"] = False
 
-            # Gemini LLM service
-            llm = GeminiLiveLLMService(
-                api_key=os.getenv("GOOGLE_API_KEY"),
-                model="models/gemini-2.5-flash-native-audio-preview-09-2025",
-                voice_id="Aoede", # Puck, Charon, Fenrir,Kore, Aoede
-                system_instruction=handlers.get_instructions(),
-                tools=handlers.tools
-            )
+        # Build initial LLM message
+        messages = [
+            {
+                "role": "user",
+                "content": (
+                    f"Please greet the caller with: 'Hi! You have reached {business_name}. "
+                    "I'm with a client but Geny can help you book your services.' "
+                    "Then ask how you can help them. The greeting should be in a friendly tone."
+                ),
+            }
+        ]
 
-            # Register handlers
-            llm.register_function("make_booking", handlers.make_booking)
-            llm.register_function("get_bookings", handlers.get_bookings)
-            llm.register_function("cancel_bookings", handlers.cancel_bookings)
-            llm.register_function("get_services", handlers.get_services)
+        llm._system_instruction = handlers.get_client_instructions()
+        llm._tools = handlers.client_tools
+        
+        # Register client functions
+        llm.register_function("make_client_booking", handlers.make_client_booking)
+        llm.register_function("get_client_bookings", handlers.get_client_bookings)
+        llm.register_function("cancel_booking", handlers.cancel_booking)
+        llm.register_function("reschedule_booking", handlers.reschedule_booking)
+        llm.register_function("get_services", handlers.get_services)
+        llm.register_function("get_business_by_phone", handlers.get_business_by_phone)
+        llm.register_function("register_client", handlers.register_client)
 
-        case "business":
-            print("2")
-        case _:
-            print("unknown")
+    # ============================================
+    # BUSINESS CALL HANDLING (FIXED)
+    # ============================================
+    elif meta['type'] == "business":
+        # Get branch reference from meta (WebRTC uses meta['branch'])
+        branch_reference = meta.get('metadata').get('branch')
+        
+        if not branch_reference:
+            logger.error("❌ No branch reference provided for business call")
+            return
 
+        # Fetch branch details
+        try:
+            response = await handlers.mcp_client.get_branch_by_reference(branch_reference)
+            branch = response.get("content", {}).get("data", {})
+            
+            if not branch:
+                logger.error(f"❌ Invalid branch reference: {branch_reference}")
+                meta["is_branch_valid"] = False
+                messages = [
+                    {
+                        "role": "user",
+                        "content": "The branch reference provided is invalid. Please check and try again."
+                    }
+                ]
+            else:
+                meta["is_branch_valid"] = True
+                meta["branch"] = branch
+                meta["business"] = branch.get("business", {})
+                
+                business_name = meta["business"].get("name", "your business")
+                
+                logger.info(f"✅ Branch validated: {branch.get('name')} - {business_name}")
+                
+                # Build greeting message
+                messages = [
+                    {
+                        "role": "user",
+                        "content": (
+                            f"'Hi, Connected to {business_name}.'"
+                            "Hit me with your request "
+                        ),
+                    }
+                ]
 
-    
+        except Exception as e:
+            logger.error(f"❌ Failed to fetch branch: {e}")
+            meta["is_branch_valid"] = False
+            messages = [
+                {
+                    "role": "user",
+                    "content": "Unable to connect to the branch system. Please try again later."
+                }
+            ]
 
-    # Conversation context
-    # messages = [{"role": "user", "content": "Hi Geny, can you help me book a service?"}]
-    messages = [
-        {
-            "role": "user",
-            "content": "Please greet the caller with: 'Hi! You've reached Sailing Winds Beauty & Wellness. I'm with a client but Geny can help you book your services.' Then ask how you can help them. the greetings should be in a friendly tone",
-        },
-    ]
-    context = OpenAILLMContext(messages)
-    context_aggregator = llm.create_context_aggregator(context)
+        # Set business instructions and tools
+        llm._system_instruction = handlers.get_business_instructions()
+        llm._tools = handlers.business_tools
+        
+        # Register business functions
+        llm.register_function("make_branch_booking", handlers.make_branch_booking)
+        llm.register_function("get_branch_bookings", handlers.get_branch_bookings)
+        llm.register_function("cancel_booking", handlers.cancel_booking)
+        # Add more business functions as needed:
+        # llm.register_function("create_walkin_booking", handlers.create_walkin_booking)
+        # llm.register_function("reschedule_booking", handlers.reschedule_booking)
+
+    # ============================================
+    # PIPELINE SETUP (Common for both)
+    # ============================================
     context = OpenAILLMContext(messages)
     context_aggregator = llm.create_context_aggregator(context)
     transcript = TranscriptProcessor()
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
 
-    # Define the pipeline
     pipeline = Pipeline([
         transport.input(),
         rtvi,
@@ -142,18 +219,11 @@ async def run_bot(transport, runner_args: RunnerArguments, caller_number: str = 
         logger.info("📞 Client connected")
         await task.queue_frames([LLMRunFrame()])
 
-
     @transport.event_handler("on_client_disconnected")
     async def on_disconnect(transport, client):
         logger.info("👋 Client disconnected")
         await task.cancel()
         await mcp_client.close()
-
-    # @transcript.event_handler("on_transcript_update")
-    # async def on_transcript(processor, frame):
-    #     for msg in frame.messages:
-    #         if isinstance(msg, TranscriptionMessage):
-    #             logger.info(f"{msg.role}: {msg.content}")
 
     @transcript.event_handler("on_transcript_update")
     async def on_transcript(processor, frame):
@@ -162,8 +232,6 @@ async def run_bot(transport, runner_args: RunnerArguments, caller_number: str = 
             text = getattr(msg, "text", None) or getattr(msg, "content", None)
             if text:
                 print(f"{role}: {text}")
-
-    
 
     runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
     try:
@@ -200,7 +268,6 @@ async def bot(runner_args: RunnerArguments):
             logger.warning("⚠️ Krisp filter not available, continuing without it")
 
     caller_number = ""
-    context = {}
 
     # ─────────────────────────────
     # Try Twilio detection first
@@ -233,9 +300,22 @@ async def bot(runner_args: RunnerArguments):
                 ),
             )
 
+            # meta2 = {
+            #     "type": "client",
+            #     "channel" : "call",
+            #     "session": "",
+            #     "language": "en",
+            #     "metadata": {
+            #         "caller": "+2348137583193",
+            #         "recipient": "+14784005765",
+            #         "call_sid": "123456",
+            #         "stream_sid": "24567899",
+            #         "account_sid": os.getenv("TWILIO_ACCOUNT_SID", ""),
+            #     }
+            # }
 
-            context = {
-                "type": "client-call",
+            meta = {
+                "type": "client",
                 "channel" : "call",
                 "session": "",
                 "language": "en",
@@ -248,8 +328,8 @@ async def bot(runner_args: RunnerArguments):
                 }
             }
 
-            logger.info(f"👤 Twilio context: {context}")
-            await run_bot(transport, runner_args, caller_number, context)
+            logger.info(f"👤 Twilio context: {meta}")
+            await run_bot(transport, runner_args, meta)
             return
 
     except Exception as e:
@@ -275,7 +355,7 @@ async def bot(runner_args: RunnerArguments):
             params=FastAPIWebsocketParams(**params.__dict__)
         )
 
-        context = {
+        meta = {
             "branch": "123456",
             "type": "business",
             "channel": "webrtc",
@@ -283,8 +363,8 @@ async def bot(runner_args: RunnerArguments):
             "session": "1234",
         }
 
-        logger.info(f"👤 WebRTC context: {context}")
-        await run_bot(transport, runner_args, caller_number="", context=context)
+        logger.info(f"👤 WebRTC context: {meta}")
+        await run_bot(transport, runner_args, meta=meta)
 
     except Exception as e:
         logger.error(f"❌ Failed to initialize WebRTC transport: {e}", exc_info=True)
@@ -294,110 +374,6 @@ async def bot(runner_args: RunnerArguments):
         logger.info("🧹 Bot session ended. Connection closed.")
 
         
-async def bot2(runner_args: RunnerArguments):
-    """Main bot entry point compatible with both Twilio and WebRTC."""
-    logger.info("🚀 Starting Gemini bot (Twilio/WebRTC support)")
-
-    
-
-    # Optional noise filter
-    if os.environ.get("ENV") != "local":
-        try:
-            from pipecat.audio.filters.krisp_filter import KrispFilter
-            krisp_filter = KrispFilter()
-            logger.info("✅ Krisp noise filter enabled")
-        except ImportError:
-            logger.warning("⚠️ Krisp filter not available, continuing without it")
-            krisp_filter = None
-    else:
-        krisp_filter = None
-
-    caller_number = ""
-
-    # Try to detect Twilio transport first
-    try:
-        transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
-        logger.info(f"📞 Detected transport type: {transport_type}")
-
-        if transport_type == "twilio":
-            # Extract caller phone number from Twilio
-            caller_number = call_data.get("body", {}).get("from", "")
-            to_number = call_data.get("body", {}).get("to", "")
-            logger.info(f"📱 Twilio caller number: {caller_number}")
-
-            # Create Twilio-specific serializer
-            serializer = TwilioFrameSerializer(
-                stream_sid=call_data["stream_id"],
-                call_sid=call_data["call_id"],
-                account_sid=os.getenv("TWILIO_ACCOUNT_SID", ""),
-                auth_token=os.getenv("TWILIO_AUTH_TOKEN", ""),
-            )
-
-            transport = FastAPIWebsocketTransport(
-                websocket=runner_args.websocket,
-                params=FastAPIWebsocketParams(
-                    audio_in_enabled=True,
-                    audio_out_enabled=True,
-                    add_wav_header=False,  # Twilio expects raw PCM16
-                    audio_in_filter=krisp_filter,
-                    vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.5)),
-                    serializer=serializer,
-                ),
-            )
-
-            context={
-                "type": "customer",
-                "channel": "twilio",
-                "branch": "123456",
-                "language": "en",
-                "session": "1234",
-                "call_info" : {
-                    "caller" : caller_number,
-                    "receipient" : to_number,
-                    "call_sid" : call_data["call_id"],
-                    "stream_sid" : call_data["stream_id"],
-                    "account_sid" : os.getenv("TWILIO_ACCOUNT_SID", "")
-                }
-            }
-
-
-            if context:
-                logger.info(f"👤 Received user context: {context}")
-           
-            await run_bot(transport, runner_args, caller_number, context)
-            return
-
-    except Exception as e:
-        logger.info(f"ℹ️ Not a Twilio connection, trying WebRTC: {e}")
-
-    # If not Twilio, use WebRTC transport
-    logger.info("🌐 Using WebRTC transport")
-    
-    transport_params = {
-        "webrtc": lambda: TransportParams(
-            audio_in_enabled=True,
-            audio_in_filter=krisp_filter,
-            audio_out_enabled=True,
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.5)),
-        ),
-    }
-
-    transport = await create_transport(runner_args, transport_params)
-
-    context={
-        "branch": "123456",
-        "type": "business",
-        "channel": "webrtc",
-        "language": "en",
-        "session": "1234",
-    }
-    print(">>>>>>>>>>>><<<<<<<<<<<<")
-    print(context)
-    print(">>>>>>>>>>>><<<<<<<<<<<<")
-    
-    # For WebRTC, caller_number remains empty (will ask user)
-    await run_bot(transport, runner_args, caller_number="", context=context)
-
 
 # -------------------------------------------------------
 # Main Entry (for local or Pipecat Cloud)

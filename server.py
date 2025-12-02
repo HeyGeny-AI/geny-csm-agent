@@ -172,10 +172,6 @@ async def bot_connect(request: Request) -> Dict[Any, Any]:
 
     return {"ws_url": ws_url}
 
-
-
-
-
 @app.websocket("/ws-browser")
 async def websocket_browser(websocket: WebSocket):
 
@@ -232,34 +228,36 @@ async def websocket_browser(websocket: WebSocket):
         print(">>>>>>>>>>>>>>>>>>>>>>>>>")
         print(runner_args)
 
-        value = ""
-        match type:
-            case "client-web":
-                await run_bot(
-                    transport=transport,
-                    runner_args=runner_args,
-                    context={
-                        "client": client,
-                        "type": "client-web",
-                        "channel": "web",
-                        "language": "en",
-                        "session": session,
-                    }
-                )
-            case "business":
-                await run_bot(
-                    transport=transport,
-                    runner_args=runner_args,
-                    context={
-                        "branch": branch,
-                        "type": "business",
-                        "channel": "mobile",
-                        "language": "en",
-                        "session": session,
-                    }
-                )
-            case _:
-                print("default")
+       
+        meta={
+            "type": "business",
+            "channel": "mobile",
+            "language": "en",
+            "session": "",
+            "metadata" : {
+                "branch": branch,
+            }
+        }
+
+        # meta2 = {
+        #     "type": "client",
+        #     "channel" : "call",
+        #     "session": "",
+        #     "language": "en",
+        #     "metadata": {
+        #         "caller": "+2348137583193",
+        #         "recipient": "+14784005765",
+        #         "call_sid": "123456",
+        #         "stream_sid": "24567899",
+        #         "account_sid": os.getenv("TWILIO_ACCOUNT_SID", ""),
+        #     }
+        # }
+
+        await run_bot(
+            transport=transport,
+            runner_args=runner_args,
+            meta=meta
+        )
 
         
 

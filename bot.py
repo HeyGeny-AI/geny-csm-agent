@@ -52,7 +52,7 @@ async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
     # Initialize MCP client
     mcp_client = NestJSMCPClient(
         base_url=os.getenv("MCP_SERVER_URL", "http://localhost:3004/v1"),
-        api_key=os.getenv("MCP_API_KEY", ""),
+        token=os.getenv("MCP_API_KEY", ""),
     )
 
     try:
@@ -342,7 +342,7 @@ async def bot(runner_args: RunnerArguments):
         except:
             pass
         raise
-    
+
 async def bot2(runner_args: RunnerArguments):
     """Main bot entry point compatible with both Twilio and WebRTC clients."""
     logger.info("🚀 Starting Gemini bot (Twilio/WebRTC support)")

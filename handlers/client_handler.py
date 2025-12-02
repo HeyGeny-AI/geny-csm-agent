@@ -274,7 +274,7 @@ class ClientHandlers:
         name = f"{first_name} {last_name}"
         phone = client.get("phone") or self.meta['metadata']['caller']
         clientId = client.get("id")
-        branch_reference = arguments.get("branch_reference") or self.meta.get("branch_reference")
+        branch_reference = self.meta.get("branch_reference")
 
         print('*****************************************')
         print(client)

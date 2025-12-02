@@ -275,6 +275,90 @@ async def bot(runner_args: RunnerArguments):
         except ImportError:
             logger.warning("⚠️ Krisp filter not available, continuing without it")
 
+    # ─────────────────────────────
+    # Try Twilio detection first
+    # ─────────────────────────────
+    try:
+        transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
+        logger.info(f"📞 Detected transport type: {transport_type}")
+        
+        if transport_type == "twilio":
+            logger.info("📱 Building Twilio transport...")
+            caller_number = call_data.get("body", {}).get("from", "")
+            to_number = call_data.get("body", {}).get("to", "")
+            logger.info(f"📞 Call: {caller_number} → {to_number}")
+            
+            serializer = TwilioFrameSerializer(
+                stream_sid=call_data["stream_id"],
+                call_sid=call_data["call_id"],
+                account_sid=os.getenv("TWILIO_ACCOUNT_SID", ""),
+                auth_token=os.getenv("TWILIO_AUTH_TOKEN", ""),
+            )
+            logger.info("✅ Serializer created")
+
+            transport = FastAPIWebsocketTransport(
+                websocket=runner_args.websocket,
+                params=FastAPIWebsocketParams(
+                    audio_in_enabled=True,
+                    audio_out_enabled=True,
+                    add_wav_header=False,
+                    audio_in_filter=krisp_filter,
+                    vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.5)),
+                    serializer=serializer,
+                ),
+            )
+            logger.info("✅ Transport created")
+
+            meta = {
+                "type": "client",
+                "channel": "call",
+                "session": "",
+                "language": "en",
+                "metadata": {
+                    "caller": caller_number,
+                    "recipient": to_number,
+                    "call_sid": call_data["call_id"],
+                    "stream_sid": call_data["stream_id"],
+                    "account_sid": os.getenv("TWILIO_ACCOUNT_SID", ""),
+                }
+            }
+
+            logger.info(f"👤 Starting bot with meta: {meta}")
+            
+            # Run the bot - this blocks until the call ends
+            try:
+                await run_bot(transport, runner_args, meta)
+                logger.info("✅ Bot completed successfully")
+            except Exception as bot_error:
+                logger.error(f"❌ Bot error: {bot_error}", exc_info=True)
+                raise
+            
+            return
+
+    except Exception as e:
+        logger.error(f"❌ Transport detection/setup failed: {e}", exc_info=True)
+        try:
+            await runner_args.websocket.close()
+        except:
+            pass
+        raise
+    
+async def bot2(runner_args: RunnerArguments):
+    """Main bot entry point compatible with both Twilio and WebRTC clients."""
+    logger.info("🚀 Starting Gemini bot (Twilio/WebRTC support)")
+
+    # ─────────────────────────────
+    # Optional noise filter
+    # ─────────────────────────────
+    krisp_filter = None
+    if os.environ.get("ENV") != "local":
+        try:
+            from pipecat.audio.filters.krisp_filter import KrispFilter
+            krisp_filter = KrispFilter()
+            logger.info("✅ Krisp noise filter enabled")
+        except ImportError:
+            logger.warning("⚠️ Krisp filter not available, continuing without it")
+
     caller_number = ""
 
     # ─────────────────────────────
@@ -333,17 +417,9 @@ async def bot(runner_args: RunnerArguments):
             logger.info(f"👤 Twilio context: {meta}")
 
             print(">>>>>>>>>  x7")
-            # await run_bot(transport, runner_args, meta)
-            @transport.event_handler("on_client_connected")
-            async def _start(transport, client):
-                print("🔥 Twilio connected — starting bot")
-                await run_bot(transport, runner_args, meta)
-
+            await run_bot(transport, runner_args, meta)
+            print(">>>>>>>>>  x8")
             return
-
-
-            # print(">>>>>>>>>  x8")
-            # return
 
     except Exception as e:
         logger.info(f"ℹ️ Not a Twilio connection, falling back to WebRTC: {e}")

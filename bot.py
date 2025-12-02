@@ -348,6 +348,7 @@ async def bot(runner_args: RunnerArguments):
 
             print(">>>>>>>>>  x7")
             await run_bot(transport, runner_args, meta)
+            print(">>>>>>>>>  x8")
             return
 
     except Exception as e:

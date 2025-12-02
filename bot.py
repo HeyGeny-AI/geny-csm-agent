@@ -283,18 +283,22 @@ async def bot(runner_args: RunnerArguments):
     try:
         transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
         logger.info(f"📞 Detected transport type: {transport_type}")
-
+        print(">>>>>>>>>  x1")
         if transport_type == "twilio":
+            print(">>>>>>>>>  x2")
             caller_number = call_data.get("body", {}).get("from", "")
             to_number = call_data.get("body", {}).get("to", "")
             logger.info(f"📱 Twilio caller number: {caller_number} → {to_number}")
-
+            
+            print(">>>>>>>>>  x3")
             serializer = TwilioFrameSerializer(
                 stream_sid=call_data["stream_id"],
                 call_sid=call_data["call_id"],
                 account_sid=os.getenv("TWILIO_ACCOUNT_SID", ""),
                 auth_token=os.getenv("TWILIO_AUTH_TOKEN", ""),
             )
+
+            print(">>>>>>>>>  x4")
 
             transport = FastAPIWebsocketTransport(
                 websocket=runner_args.websocket,
@@ -307,6 +311,8 @@ async def bot(runner_args: RunnerArguments):
                     serializer=serializer,
                 ),
             )
+
+            print(">>>>>>>>>  x5")
 
             # meta2 = {
             #     "type": "client",
@@ -336,7 +342,11 @@ async def bot(runner_args: RunnerArguments):
                 }
             }
 
+            print(">>>>>>>>>  x6")
+
             logger.info(f"👤 Twilio context: {meta}")
+
+            print(">>>>>>>>>  x7")
             await run_bot(transport, runner_args, meta)
             return
 

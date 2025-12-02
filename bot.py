@@ -72,16 +72,19 @@ async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
 
     messages = []
     handlers = ClientHandlers(mcp_client, meta=meta)
-
+    print(">>>>>>>>>>> 1")
     # ============================================
     # CLIENT CALL HANDLING
     # ============================================
     if meta['type'] == "client":
+        print(">>>>>>>>>>> 2")
         # Fetch business by phone
         branch = await handlers.fetch_business_by_phone(meta['metadata']['recipient'])
         business_name = branch['business']['name']
         branch_reference = branch['branch']['reference']
         meta["branch_reference"] = branch_reference
+
+        print(">>>>>>>>>>> 3")
 
         # Check if client is already registered
         caller_phone = meta['metadata']['caller']
@@ -97,6 +100,7 @@ async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
             meta["is_client_registered"] = False
             handlers.meta["is_client_registered"] = False
 
+        print(">>>>>>>>>>> 4")
         # Build initial LLM message
         messages = [
             {
@@ -109,6 +113,8 @@ async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
             }
         ]
 
+        print(">>>>>>>>>>> 5")
+
         llm._system_instruction = handlers.get_client_instructions()
         llm._tools = handlers.client_tools
         
@@ -120,6 +126,8 @@ async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
         llm.register_function("get_services", handlers.get_services)
         llm.register_function("get_business_by_phone", handlers.get_business_by_phone)
         llm.register_function("register_client", handlers.register_client)
+
+        print(">>>>>>>>>>> 6")
 
     # ============================================
     # BUSINESS CALL HANDLING (FIXED)

@@ -117,9 +117,15 @@ class ClientHandlers:
         is_branch_valid = self.meta.get("is_branch_valid", False)
         client = self.meta.get("client", {})
 
+        language = self.meta.get("branch").get("country")
+
+        print(">>>>>>><<<<<<<<<<<<")
+        print(language)
+
         instructions = f"""
         You are Geny, a friendly AI voice assistant who helps business manage bookings and assist walk-in clients.
 
+        BOT should always communicate in {language} accent.
         ===============================
         📌 BRANCH REFERENCE
         ===============================
@@ -687,9 +693,10 @@ class ClientHandlers:
     # ---------------------------------------------------------
     async def reschedule_booking(self, params: FunctionCallParams):
         arguments = params.arguments or {}
-        code = arguments.get("code", "")
-        code = arguments.get("code", "")
-        code = arguments.get("code", "")
+        code = arguments.get("code")
+        date = arguments.get("date")
+        time = arguments.get("time")
+        service = arguments.get("service")
 
         if not code:
             await params.result_callback({"status": "error", "message": "Booking code is required"})

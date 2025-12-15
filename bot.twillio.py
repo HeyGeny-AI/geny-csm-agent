@@ -305,8 +305,8 @@ async def run_bot(transport: FastAPIWebsocketTransport, runner_args: RunnerArgum
         required=["name"],
     )
 
-    cancel_bookings_function = FunctionSchema(
-        name="cancel_bookings",
+    cancel_booking_function = FunctionSchema(
+        name="cancel_booking",
         description="cancel bookings by customer name.",
         properties={"name": {"type": "string"}},
         required=["name"],

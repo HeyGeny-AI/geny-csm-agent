@@ -23,6 +23,7 @@ from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
 )
 from bot import run_bot
+from pipecat.serializers.protobuf import ProtobufFrameSerializer
 
 # Load environment variables from .env file
 load_dotenv()
@@ -152,20 +153,24 @@ async def twilio_websocket_endpoint(websocket: WebSocket):
 
 @app.post("/connect")
 async def bot_connect(request: Request) -> Dict[Any, Any]:
+
+    query_string = request.url.query
+
     server_mode = os.getenv("WEBSOCKET_SERVER", "fast_api")
     if server_mode == "websocket_server":
-        # ws_url = "ws://localhost:8765"
-        ws_url = "wss://pipecat.server.heygeny.com"
+        ws_url = "ws://localhost:8765"
+        # ws_url = "wss://pipecat.server.heygeny.com"
         
     else:
-        # ws_url = "ws://localhost:7860/ws-browser"
-        ws_url = "wss://pipecat.server.heygeny.com/ws-browser"
+        ws_url = "ws://localhost:7860/ws-browser"
+        # ws_url = "wss://pipecat.server.heygeny.com/ws-browser"
+    # return {"ws_url": ws_url}
+
+     # Append query params to websocket URL
+    if query_string:
+        ws_url = f"{ws_url}?{query_string}"
+
     return {"ws_url": ws_url}
-
-
-from pipecat.serializers.protobuf import ProtobufFrameSerializer
-
-
 
 @app.websocket("/ws-browser")
 async def websocket_browser(websocket: WebSocket):
@@ -180,9 +185,13 @@ async def websocket_browser(websocket: WebSocket):
 
      # Extract query parameters
     query_params = dict(websocket.query_params)
+    type = query_params.get("type", "")
     branch = query_params.get("branch", "")
+    client = query_params.get("client", "")
     session = query_params.get("session", "")
+    channel = query_params.get("channel", "")
     
+    print(query_params)
     print(f"📱 Browser connection params:")
     print(f"   branch: {branch}")
     print(f"   Session ID: {session}")
@@ -216,19 +225,41 @@ async def websocket_browser(websocket: WebSocket):
             ),
         )
 
+        print(">>>>>>>>>>>>>>>>>>>>>>>>>")
+        print(runner_args)
+
+       
+        meta={
+            "type": "business",
+            "channel": "mobile",
+            "language": "en",
+            "session": "",
+            "metadata" : {
+                "branch": branch,
+            }
+        }
+
+        # meta2 = {
+        #     "type": "client",
+        #     "channel" : "call",
+        #     "session": "",
+        #     "language": "en",
+        #     "metadata": {
+        #         "caller": "+2348137583193",
+        #         "recipient": "+14784005765",
+        #         "call_sid": "123456",
+        #         "stream_sid": "24567899",
+        #         "account_sid": os.getenv("TWILIO_ACCOUNT_SID", ""),
+        #     }
+        # }
+
         await run_bot(
             transport=transport,
             runner_args=runner_args,
-            caller_number="browser-user",
-            context={
-                "branch": branch,
-                "type": "business",
-                "channel": "webrtc",
-                # "phone": "",
-                "language": "en",
-                "session": session,
-            }
+            meta=meta
         )
+
+        
 
     except Exception as e:
         import traceback

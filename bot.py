@@ -122,12 +122,11 @@ async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
         llm.register_function("make_client_booking", handlers.make_client_booking)
         llm.register_function("get_client_bookings", handlers.get_client_bookings)
         llm.register_function("cancel_booking", handlers.cancel_booking)
-        llm.register_function("reschedule_booking", handlers.reschedule_booking)
+        llm.register_function("update_booking", handlers.update_booking)
         llm.register_function("get_services", handlers.get_services)
         llm.register_function("get_business_by_phone", handlers.get_business_by_phone)
         llm.register_function("register_client", handlers.register_client)
-
-        print(">>>>>>>>>>> 6")
+        llm.register_function("get_availability_branch", handlers.get_availability_branch)
 
     # ============================================
     # BUSINESS CALL HANDLING (FIXED)
@@ -151,7 +150,7 @@ async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
                 messages = [
                     {
                         "role": "user",
-                        "content": "The branch reference provided is invalid. Please check and try again."
+                        "content": "The branch provided is invalid. Please check and try again."
                     }
                 ]
             else:
@@ -192,9 +191,10 @@ async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
         llm.register_function("make_branch_booking", handlers.make_branch_booking)
         llm.register_function("get_branch_bookings", handlers.get_branch_bookings)
         llm.register_function("cancel_booking", handlers.cancel_booking)
+        llm.register_function("update_booking", handlers.update_booking)
+        llm.register_function("get_availability_branch", handlers.get_availability_branch)
         # Add more business functions as needed:
         # llm.register_function("create_walkin_booking", handlers.create_walkin_booking)
-        # llm.register_function("reschedule_booking", handlers.reschedule_booking)
 
     # ============================================
     # PIPELINE SETUP (Common for both)

@@ -117,15 +117,10 @@ class ClientHandlers:
         is_branch_valid = self.meta.get("is_branch_valid", False)
         client = self.meta.get("client", {})
 
-        language = self.meta.get("branch").get("country")
-
-        print(">>>>>>><<<<<<<<<<<<")
-        print(language)
-
+        
         instructions = f"""
         You are Geny, a friendly AI voice assistant who helps business manage bookings and assist walk-in clients.
 
-        BOT should always communicate in {language} accent.
         ===============================
         📌 BRANCH REFERENCE
         ===============================
@@ -146,7 +141,7 @@ class ClientHandlers:
         ===============================
         Before performing any booking operation:
         - Ensure branch is valid.
-        - Collect only missing information: service, date (YYYY-MM-DD), and time (HH:MM 24-hour).
+        - Collect only missing information: service, date.
         - Branch reference is already provided; never ask for it.
         - Combine first & last name from client profile for the "name" field.
         - Request phone number, including country code.
@@ -154,8 +149,9 @@ class ClientHandlers:
         Booking operations you can perform:
         1. **View all bookings** – list all bookings for the branch or a specific client.
         2. **Create a booking** – for walk-in clients or registered clients.
-        3. **Reschedule a booking** – request only new date and time, confirm changes before finalizing.
+        3. **update a booking** – request only booking code, new date, new time and the service, confirm changes before finalizing.
         4. **Cancel a booking** – confirm before cancellation, never assume.
+        5. **check availability** – check the timeslot for when there is an open slot to book.
 
         ===============================
         📌 GENERAL BEHAVIOR
@@ -165,6 +161,7 @@ class ClientHandlers:
         Only ask for information that is missing.
         Never ask for names for registered clients.
         Ensure privacy and proper handling of all client data.
+        DO not switch accent, use one accent for the whole conversation
         """
 
         return instructions
@@ -198,7 +195,7 @@ class ClientHandlers:
             "date": {"type": "string", "description": "Date in YYYY-MM-DD format"},
             "time": {"type": "string", "description": "Time in HH:MM 24-hour format"},
         },
-        required=["name", "service", "date", "time"],
+        required=["name", "phone", "service", "date", "time"],
     )
 
     get_client_bookings_function = FunctionSchema(
@@ -208,6 +205,17 @@ class ClientHandlers:
         required=[],
     )
 
+    # get_client_availabilty_function = FunctionSchema(
+    #     name="update_booking",
+    #     description="Update an existing booking from both client and business.",
+    #     properties={
+    #         "service": {"type": "string", "description": "the service you wanna update to"},
+    #         "date": {"type": "string", "description": "new date Date"},
+    #         "time": {"type": "string", "description": "new Time"},
+    #     },
+    #     required=["code", "service", "date", "time"],
+    # )
+
 
     get_branch_bookings_function = FunctionSchema(
         name="get_branch_bookings",
@@ -215,6 +223,16 @@ class ClientHandlers:
         properties={},
         required=[],
     )
+
+    get_availability_branch_function = FunctionSchema(
+        name="get_availability_branch",
+        description="get branch availability",
+        properties={
+            "date": {"type": "string", "description": "date"}, 
+        },
+        required=["date"],
+    )
+
 
     cancel_booking_function = FunctionSchema(
         name="cancel_booking",
@@ -244,22 +262,35 @@ class ClientHandlers:
         required=["firstName", "lastName"],
     )
 
+    update_booking_function = FunctionSchema(
+        name="update_booking",
+        description="Update an existing booking from both client and business.",
+        properties={
+            "code": {"type": "string", "description": "the original booking code for the booking"},
+            "service": {"type": "string", "description": "the service you wanna update to"},
+            "date": {"type": "string", "description": "new date Date"},
+            "time": {"type": "string", "description": "new Time"},
+        },
+        required=["code", "service", "date", "time"],
+    )
+
 
     client_tools = ToolsSchema(standard_tools=[
         make_client_booking_function, 
         get_client_bookings_function, 
         cancel_booking_function, 
         get_services_function,
-        register_client_function
+        register_client_function,
+        update_booking_function,
+        get_availability_branch_function
     ])
 
     business_tools = ToolsSchema(standard_tools=[
         make_branch_booking_function, 
-        # get_client_bookings_function, 
         get_branch_bookings_function,
         cancel_booking_function, 
-        # get_services_function,
-        # register_client_function
+        update_booking_function,
+        get_availability_branch_function
     ])
 
     # ---------------------------------------------------------
@@ -545,6 +576,114 @@ class ClientHandlers:
                 "status": "error",
                 "message": "Unable to fetch client bookings at this time."
             })
+    # ---------------------------------------------------------
+    # GET AVAILABILITY BY CLIENT
+    # ---------------------------------------------------------
+    async def get_client_availability(self, params: FunctionCallParams):
+        """
+        Fetch client appointments and provide both structured and natural-language output.
+        Greets the user, lists all bookings, and ends with a friendly message.
+        Converts ISO 8601 dates to "30th (Sunday) of December 2025".
+        Converts military time to 12-hour format with AM/PM.
+        Includes start and end times in spoken output.
+        """
+        try:
+            # Ensure client is registered
+            client = await self.ensure_registered(params)
+
+            # Fetch appointments for the client
+            result = await self.mcp_client.get_client_bookings(client['id'])
+            appointment_data = result.get("content", {}).get("data", [])
+
+            if not appointment_data:
+                await params.result_callback({
+                    "status": "success",
+                    "services": [],
+                    "spoken": "You have no appointments at the moment."
+                })
+                return
+
+            spoken_text = ["You have the following bookings:"]
+
+            # Helper to convert military time to 12-hour AM/PM
+            def format_time(military_time):
+                if not military_time:
+                    return "Unknown time"
+                try:
+                    time_str = str(military_time).zfill(4)  # e.g., 900 -> '0900'
+                    hour = int(time_str[:2])
+                    minute = int(time_str[2:])
+                    time_obj = datetime.strptime(f"{hour}:{minute}", "%H:%M")
+                    return time_obj.strftime("%I:%M %p").lstrip("0")
+                except Exception:
+                    return str(military_time)
+
+            # Helper to format date
+            def format_date(date_str):
+                if not date_str:
+                    return "Unknown date"
+                try:
+                    # Parse only the date part, ignore time and timezone
+                    date_obj = datetime.strptime(date_str[:10], "%Y-%m-%d")
+                    day = date_obj.day
+                    weekday = date_obj.strftime("%A")
+                    month = date_obj.strftime("%B")
+                    year = date_obj.year
+
+                    # Determine ordinal suffix
+                    # if 4 <= day <= 20 or 24 <= day <= 30:
+                    #     suffix = "th"
+                    # else:
+                    #     suffix = ["st", "nd", "rd"][day % 10 - 1]
+                    if 4 <= day <= 20 or 24 <= day <= 30:
+                        suffix = "th"
+                    else:
+                        suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+
+                    return f"{day}{suffix} ({weekday}) of {month} {year}"
+                except Exception:
+                    return date_str
+                
+            # Loop through appointments
+            for app in appointment_data:
+
+                description = getattr(app, 'description', None) or app.get('description', 'Unknown service')
+                date_str = getattr(app, 'date', None) or app.get('date', None)
+                start_time = getattr(app, 'hourStart', None) or  app.get('hourStart')
+                end_time = getattr(app, 'hourEnd', None) or  app.get('hourEnd')
+                code = getattr(app, 'code', None) or app.get('code', 'N/A')
+
+                formatted_date = format_date(date_str)
+                formatted_start = format_time(start_time)
+                formatted_end = format_time(end_time)
+
+                # Build spoken text per appointment
+                if formatted_end != "Unknown time":
+                    spoken_text.append(
+                        f"- {description} on {formatted_date} from {formatted_start} to {formatted_end} with booking code: {code}."
+                    )
+                else:
+                    spoken_text.append(
+                        f"- {description} on {formatted_date} at {formatted_start} with booking code: {code}."
+                    )
+
+            # Add friendly closing
+            spoken_text.append("Thank you! Can I help you with something else ?.")
+
+            formatted_text = " ".join(spoken_text)
+
+            await params.result_callback({
+                "status": "success",
+                "services": appointment_data,
+                "spoken": formatted_text
+            })
+
+        except Exception as e:
+            logger.error(f"Failed to get client bookings: {e}", exc_info=True)
+            await params.result_callback({
+                "status": "error",
+                "message": "Unable to fetch client bookings at this time."
+            })
     
     # ---------------------------------------------------------
     # GET BOOKINGS BY BRANCH
@@ -566,9 +705,6 @@ class ClientHandlers:
             # Fetch appointments for the client
             result = await self.mcp_client.get_branch_bookings(branchId)
 
-            print(branchId)
-            print(">>>>>>>>>>>>>")
-            print(result)
             appointment_data = result.get("content", {}).get("data", [])
 
             if not appointment_data:
@@ -666,7 +802,6 @@ class ClientHandlers:
     # ---------------------------------------------------------
     async def cancel_booking(self, params: FunctionCallParams):
 
-        print(">>>>>>>???????")
         arguments = params.arguments or {}
         code = arguments.get("code", "")
         reason = arguments.get("reason", "")
@@ -678,8 +813,7 @@ class ClientHandlers:
 
         try:
             result = await self.mcp_client.call_tool("cancel_booking", {"code": code, "reason" : reason, "source" : self.meta['type']})
-            print(result)
-            print("*********************")
+          
             msg = result.get("content", {}).get("text", "Booking cancelled successfully.")
 
             await params.result_callback({"status": "success", "message": msg})
@@ -688,10 +822,11 @@ class ClientHandlers:
             logger.error(f"Failed to cancel booking: {e}")
             await params.result_callback({"status": "error", "message": str(e)})
 
+   
     # ---------------------------------------------------------
     # RESCHEDULE BOOKING
     # ---------------------------------------------------------
-    async def reschedule_booking(self, params: FunctionCallParams):
+    async def update_booking(self, params: FunctionCallParams):
         arguments = params.arguments or {}
         code = arguments.get("code")
         date = arguments.get("date")
@@ -703,10 +838,8 @@ class ClientHandlers:
             return
 
         try:
-            result = await self.mcp_client.call_tool("cancel_booking", {"code": code})
-            print(result)
-            print("*********************")
-            msg = result.get("content", {}).get("text", "Booking cancelled successfully.")
+            result = await self.mcp_client.call_tool("update_booking", {"code": code, "date": date, "time" :  time, "service": service})
+            msg = result.get("content", {}).get("text", "Booking updated successfully.")
 
             await params.result_callback({"status": "success", "message": msg})
 
@@ -755,6 +888,96 @@ class ClientHandlers:
         except Exception as e:
             logger.error(f"Failed to get services: {e}")
             await params.result_callback({"status": "error", "message": str(e)})
+
+    def to_ampm(self,hhmm: int) -> str:
+        hour = hhmm // 100
+        minute = hhmm % 100
+
+        period = "AM" if hour < 12 else "PM"
+        hour_12 = hour % 12 or 12
+
+        return f"{hour_12}:{minute:02d} {period}"
+
+
+    # ---------------------------------------------------------
+    # GET branch availability
+    # ---------------------------------------------------------
+    async def get_availability_branch(self, params: FunctionCallParams):
+      
+        arguments = params.arguments or {}
+        date = arguments.get("date")
+        branchId = self.meta.get("branch", {}).get("id")
+
+        try:
+            result = await self.mcp_client.call_tool(
+                "get_branch_availability_by_reference",
+                {"date": date, "branchId": branchId, "branchPhone" : self.meta['metadata']['recipient']}
+            )
+
+            content = result.get("content")
+            print(content)
+
+            if not content:
+                await params.result_callback({
+                    "content": [
+                        { "type": "text", "text": "All timeslot are open." }
+                    ]
+                })
+            else:
+            
+                DAY_START = 9   # 9 AM
+                DAY_END = 18    # 6 PM
+
+                content = result.get("content", [])
+
+                # 1. Parse unavailable slots
+                unavailable = set()
+
+                for item in content:
+                    text = item.get("text", "")
+                    try:
+                        start, end = text.replace(" ", "").split("to")
+                        unavailable.add((int(start), int(end)))
+                    except ValueError:
+                        continue
+
+                # 2. Generate available slots
+                available_slots = []
+
+                for hour in range(DAY_START, DAY_END):
+                    start = hour * 100
+                    end = (hour + 1) * 100
+
+                    if (start, end) not in unavailable:
+                        available_slots.append(
+                            f"{self.to_ampm(start)} to {self.to_ampm(end)}"
+                        )
+
+                # 3. Speak as one message
+                if available_slots:
+                    message = (
+                        "The available time slots for the day are: "
+                        + ", ".join(available_slots)
+                    )
+                else:
+                    message = "There are no available time slots for this day."
+
+                await params.result_callback({
+                    "content": [
+                        { "type": "text", "text": message }
+                    ]
+                })
+
+        except Exception as e:
+            logger.error(f"Failed to get availability: {e}")
+            await params.result_callback({
+                "status": "error",
+                "message": "Unable to retrieve branch availability."
+            })
+
+
+
+    
 
     # ---------------------------------------------------------
     # GET Business by phone

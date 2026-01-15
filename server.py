@@ -229,29 +229,29 @@ async def websocket_browser(websocket: WebSocket):
         print(runner_args)
 
        
-        meta={
-            "type": "business",
-            "channel": "mobile",
-            "language": "en",
-            "session": "",
-            "metadata" : {
-                "branch": branch,
-            }
-        }
-
-        # meta2 = {
-        #     "type": "client",
-        #     "channel" : "call",
-        #     "session": "",
+        # meta={
+        #     "type": "business",
+        #     "channel": "mobile",
         #     "language": "en",
-        #     "metadata": {
-        #         "caller": "+2348137583193",
-        #         "recipient": "+14784005765",
-        #         "call_sid": "123456",
-        #         "stream_sid": "24567899",
-        #         "account_sid": os.getenv("TWILIO_ACCOUNT_SID", ""),
+        #     "session": "",
+        #     "metadata" : {
+        #         "branch": branch,
         #     }
         # }
+
+        meta = {
+            "type": "client",
+            "channel" : "call",
+            "session": "",
+            "language": "en",
+            "metadata": {
+                "caller": "+2348137583193",
+                "recipient": "+14784005765",
+                "call_sid": "123456",
+                "stream_sid": "24567899",
+                "account_sid": os.getenv("TWILIO_ACCOUNT_SID", ""),
+            }
+        }
 
         await run_bot(
             transport=transport,

@@ -66,6 +66,16 @@ class NestJSMCPClient:
             "branch_reference": branch_reference,
             "clientId": clientId,
         })
+    
+     # Update: booking
+    async def update_booking(self, code, date, time, service):
+        return await self.call_tool("update_booking", {
+            "code": code,
+            "date": date,
+            "time": time,
+            "service": service,
+        })
+
 
     # BOOKING: BRANCH
     async def make_branch_booking(self, name, phone, service, timestamp, branchId):
@@ -85,6 +95,7 @@ class NestJSMCPClient:
 
     async def get_services(self, branch_reference):
         return await self.call_tool("get_services", {"reference": branch_reference})
+    
 
     async def register_client(self, firstName, lastName, phone):
         return await self.call_tool("register_client", {

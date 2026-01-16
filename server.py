@@ -238,8 +238,9 @@ async def websocket_browser(websocket: WebSocket):
                 "branch": branch,
             }
         }
-
-        # meta2 = {
+        
+        # simulate client calling 
+        # meta = {
         #     "type": "client",
         #     "channel" : "call",
         #     "session": "",

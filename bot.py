@@ -135,6 +135,8 @@ async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
 
     x = "1"
     if x == "1":
+        
+        print(">>>>>> inside business")
         # Get branch reference from meta (WebRTC uses meta['branch'])
         branch_reference = meta.get('metadata').get('branch')
         

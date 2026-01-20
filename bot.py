@@ -186,6 +186,9 @@ async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
         # Set business instructions and tools
         llm._system_instruction = handlers.get_business_instructions()
         llm._tools = handlers.business_tools
+
+
+        print(handlers.get_business_instructions())
         
         # Register business functions
         llm.register_function("make_branch_booking", handlers.make_branch_booking)

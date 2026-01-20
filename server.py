@@ -276,5 +276,7 @@ if __name__ == "__main__":
     args, _ = parser.parse_known_args()
 
     app.state.testing = args.test
+    print(">>>>> server url")
+    print(os.getenv('MCP_SERVER_URL'))
 
     uvicorn.run(app, host="0.0.0.0", port=7860)

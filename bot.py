@@ -76,67 +76,62 @@ async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
     # ============================================
     # CLIENT CALL HANDLING
     # ============================================
-    # if meta['type'] == "client":
-    #     print(">>>>>>>>>>> 2")
-    #     # Fetch business by phone
-    #     branch = await handlers.fetch_business_by_phone(meta['metadata']['recipient'])
-    #     business_name = branch['business']['name']
-    #     branch_reference = branch['branch']['reference']
-    #     meta["branch_reference"] = branch_reference
+    if meta['type'] == "client":
+        print(">>>>>>>>>>> 2")
+        # Fetch business by phone
+        branch = await handlers.fetch_business_by_phone(meta['metadata']['recipient'])
+        business_name = branch['business']['name']
+        branch_reference = branch['branch']['reference']
+        meta["branch_reference"] = branch_reference
 
-    #     print(">>>>>>>>>>> 3")
+        print(">>>>>>>>>>> 3")
 
-    #     # Check if client is already registered
-    #     caller_phone = meta['metadata']['caller']
-    #     client = await handlers.mcp_client.get_client_by_phone(caller_phone)
-    #     client_data = client.get("content", {}).get("data", {})
+        # Check if client is already registered
+        caller_phone = meta['metadata']['caller']
+        client = await handlers.mcp_client.get_client_by_phone(caller_phone)
+        client_data = client.get("content", {}).get("data", {})
         
-    #     if client_data:
-    #         meta["is_client_registered"] = True
-    #         meta["client"] = client_data
-    #         handlers.meta["client"] = client_data
-    #         handlers.meta["is_client_registered"] = True
-    #     else:
-    #         meta["is_client_registered"] = False
-    #         handlers.meta["is_client_registered"] = False
+        if client_data:
+            meta["is_client_registered"] = True
+            meta["client"] = client_data
+            handlers.meta["client"] = client_data
+            handlers.meta["is_client_registered"] = True
+        else:
+            meta["is_client_registered"] = False
+            handlers.meta["is_client_registered"] = False
 
-    #     print(">>>>>>>>>>> 4")
-    #     # Build initial LLM message
-    #     messages = [
-    #         {
-    #             "role": "user",
-    #             "content": (
-    #                 f"Please greet the caller with: 'Hi! You have reached {business_name}. "
-    #                 "I'm with a client but Geny can help you book your services.' "
-    #                 "Then ask how you can help them. The greeting should be in a friendly tone."
-    #             ),
-    #         }
-    #     ]
+        print(">>>>>>>>>>> 4")
+        # Build initial LLM message
+        messages = [
+            {
+                "role": "user",
+                "content": (
+                    f"Please greet the caller with: 'Hi! You have reached {business_name}. "
+                    "I'm with a client but Geny can help you book your services.' "
+                    "Then ask how you can help them. The greeting should be in a friendly tone."
+                ),
+            }
+        ]
 
-    #     print(">>>>>>>>>>> 5")
+        print(">>>>>>>>>>> 5")
 
-    #     llm._system_instruction = handlers.get_client_instructions()
-    #     llm._tools = handlers.client_tools
+        llm._system_instruction = handlers.get_client_instructions()
+        llm._tools = handlers.client_tools
         
-    #     # Register client functions
-    #     llm.register_function("make_client_booking", handlers.make_client_booking)
-    #     llm.register_function("get_client_bookings", handlers.get_client_bookings)
-    #     llm.register_function("cancel_booking", handlers.cancel_booking)
-    #     llm.register_function("update_booking", handlers.update_booking)
-    #     llm.register_function("get_services", handlers.get_services)
-    #     llm.register_function("get_business_by_phone", handlers.get_business_by_phone)
-    #     llm.register_function("register_client", handlers.register_client)
-    #     llm.register_function("get_availability_branch", handlers.get_availability_branch)
+        # Register client functions
+        llm.register_function("make_client_booking", handlers.make_client_booking)
+        llm.register_function("get_client_bookings", handlers.get_client_bookings)
+        llm.register_function("cancel_booking", handlers.cancel_booking)
+        llm.register_function("update_booking", handlers.update_booking)
+        llm.register_function("get_services", handlers.get_services)
+        llm.register_function("get_business_by_phone", handlers.get_business_by_phone)
+        llm.register_function("register_client", handlers.register_client)
+        llm.register_function("get_availability_branch", handlers.get_availability_branch)
 
     # ============================================
     # BUSINESS CALL HANDLING (FIXED)
     # ============================================
-    # elif meta['type'] == "business":
-
-    x = "1"
-    if x == "1":
-        
-        print(">>>>>> inside business")
+    elif meta['type'] == "business":
         # Get branch reference from meta (WebRTC uses meta['branch'])
         branch_reference = meta.get('metadata').get('branch')
         

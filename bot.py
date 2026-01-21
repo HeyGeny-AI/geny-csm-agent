@@ -133,7 +133,9 @@ async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
     # ============================================
     elif meta['type'] == "business":
         # Get branch reference from meta (WebRTC uses meta['branch'])
-        branch_reference = meta.get('metadata').get('branch')
+        # branch_reference = meta.get('metadata').get('branch')
+        branch_reference = meta.get('metadata', {}).get('branch')
+
         
         if not branch_reference:
             logger.error("❌ No branch reference provided for business call")

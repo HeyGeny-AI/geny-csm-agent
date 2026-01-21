@@ -185,11 +185,11 @@ async def websocket_browser(websocket: WebSocket):
 
      # Extract query parameters
     query_params = dict(websocket.query_params)
-    type = query_params.get("type", "")
+    type = query_params.get("type", "business")
     branch = query_params.get("branch", "")
     client = query_params.get("client", "")
     session = query_params.get("session", "")
-    channel = query_params.get("channel", "")
+    channel = query_params.get("channel", "web")
     
     print(query_params)
     print(f"📱 Browser connection params:")
@@ -230,10 +230,10 @@ async def websocket_browser(websocket: WebSocket):
 
        
         meta={
-            "type": "business",
-            "channel": "mobile",
+            "type": type,
+            "channel": channel,
             "language": "en",
-            "session": "",
+            "session": session,
             "metadata" : {
                 "branch": branch,
             }

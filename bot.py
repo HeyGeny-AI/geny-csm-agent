@@ -166,13 +166,21 @@ async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
                 logger.info(f"✅ Branch validated: {branch.get('name')} - {business_name}")
                 
                 # Build greeting message
+                # messages = [
+                #     {
+                #         "role": "user",
+                #         "content": (
+                #             f"'Hi, Connected to {business_name}.'"
+                #             "Hit me with your request "
+                #         ),
+                #     }
+                # ]
+
+
                 messages = [
                     {
                         "role": "user",
-                        "content": (
-                            f"'Hi, Connected to {business_name}.'"
-                            "Hit me with your request "
-                        ),
+                        "content": f"A business user has just connected to the {business_name} system. Greet them warmly and ask how you can help them today."
                     }
                 ]
 

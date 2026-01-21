@@ -76,7 +76,7 @@ async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
     # ============================================
     # CLIENT CALL HANDLING
     # ============================================
-    if meta['type'] == "client":
+    if meta['type'] == "clientx":
         print(">>>>>>>>>>> 2")
         # Fetch business by phone
         branch = await handlers.fetch_business_by_phone(meta['metadata']['recipient'])
@@ -131,7 +131,8 @@ async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
     # ============================================
     # BUSINESS CALL HANDLING (FIXED)
     # ============================================
-    elif meta['type'] == "business":
+    # elif meta['type'] == "business":
+    else:
         # Get branch reference from meta (WebRTC uses meta['branch'])
         # branch_reference = meta.get('metadata').get('branch')
         branch_reference = meta.get('metadata', {}).get('branch')

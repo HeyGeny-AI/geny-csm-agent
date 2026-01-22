@@ -1016,7 +1016,11 @@ class ClientHandlers:
 
         branch_id = self.meta.get("branch", {}).get("id")
         branch_phone = self.meta.get("metadata", {}).get("recipient")
-
+        
+        print("***************************************** 1")
+        print(branch_id)
+        print(branch_phone)
+        
         if branch_id:
             payload["branchId"] = branch_id
 
@@ -1033,6 +1037,9 @@ class ClientHandlers:
                 ]
             })
             return
+
+        print("***************************************** 2")
+        print(payload)
 
         try:
             result = await self.mcp_client.call_tool(

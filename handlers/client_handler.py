@@ -1007,12 +1007,37 @@ class ClientHandlers:
       
         arguments = params.arguments or {}
         date = arguments.get("date")
-        branchId = self.meta.get("branch", {}).get("id")
+        # branchId = self.meta.get("branch", {}).get("id")
+
+
+        payload = {
+            "date": date
+        }
+
+        branch_id = self.meta.get("branch", {}).get("id")
+        branch_phone = self.meta.get("metadata", {}).get("recipient")
+
+        if branch_id:
+            payload["branchId"] = branch_id
+
+        if branch_phone:
+            payload["branchPhone"] = branch_phone
+
+        if "branchId" not in payload and "branchPhone" not in payload:
+            await params.result_callback({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "I’m missing the branch information needed to check availability."
+                    }
+                ]
+            })
+            return
 
         try:
             result = await self.mcp_client.call_tool(
                 "get_branch_availability_by_reference",
-                {"date": date, "branchId": branchId, "branchPhone" : self.meta['metadata']['recipient']}
+                payload
             )
 
             content = result.get("content")

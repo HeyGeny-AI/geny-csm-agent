@@ -76,7 +76,7 @@ async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
     # ============================================
     # CLIENT CALL HANDLING
     # ============================================
-    if meta['type'] == "clientx":
+    if meta['type'] == "client":
         print(">>>>>>>>>>> 2")
         # Fetch business by phone
         branch = await handlers.fetch_business_by_phone(meta['metadata']['recipient'])
@@ -131,8 +131,8 @@ async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
     # ============================================
     # BUSINESS CALL HANDLING (FIXED)
     # ============================================
-    # elif meta['type'] == "business":
-    else:
+    elif meta['type'] == "business":
+    # else:
 
 
         # ✅ PREPARE TOOLS FIRST

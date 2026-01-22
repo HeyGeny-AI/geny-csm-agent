@@ -133,6 +133,27 @@ async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
     # ============================================
     # elif meta['type'] == "business":
     else:
+
+
+        # ✅ PREPARE TOOLS FIRST
+        system_instruction = handlers.get_business_instructions()
+        business_tools = handlers.business_tools
+        
+        # ✅ CREATE LLM WITH TOOLS FROM START
+        llm = GeminiLiveLLMService(
+            api_key=os.getenv("GOOGLE_API_KEY"),
+            model="models/gemini-2.5-flash-native-audio-preview-09-2025",
+            voice_id="Aoede",
+            system_instruction=system_instruction,
+            tools=business_tools  # ✅ Pass tools during init
+        )
+
+        llm.register_function("make_branch_booking", handlers.make_branch_booking)
+        llm.register_function("get_branch_bookings", handlers.get_branch_bookings)
+        llm.register_function("cancel_booking", handlers.cancel_booking)
+        llm.register_function("update_booking", handlers.update_booking)
+        llm.register_function("get_availability_branch", handlers.get_availability_branch)
+
         # Get branch reference from meta (WebRTC uses meta['branch'])
         # branch_reference = meta.get('metadata').get('branch')
         branch_reference = meta.get('metadata', {}).get('branch')
@@ -195,18 +216,18 @@ async def run_bot(transport, runner_args: RunnerArguments, meta: dict = None):
             ]
 
         # Set business instructions and tools
-        llm._system_instruction = handlers.get_business_instructions()
-        llm._tools = handlers.business_tools
+        # llm._system_instruction = handlers.get_business_instructions()
+        # llm._tools = handlers.business_tools
 
 
-        print(handlers.get_business_instructions())
+        # print(handlers.get_business_instructions())
         
         # Register business functions
-        llm.register_function("make_branch_booking", handlers.make_branch_booking)
-        llm.register_function("get_branch_bookings", handlers.get_branch_bookings)
-        llm.register_function("cancel_booking", handlers.cancel_booking)
-        llm.register_function("update_booking", handlers.update_booking)
-        llm.register_function("get_availability_branch", handlers.get_availability_branch)
+        # llm.register_function("make_branch_booking", handlers.make_branch_booking)
+        # llm.register_function("get_branch_bookings", handlers.get_branch_bookings)
+        # llm.register_function("cancel_booking", handlers.cancel_booking)
+        # llm.register_function("update_booking", handlers.update_booking)
+        # llm.register_function("get_availability_branch", handlers.get_availability_branch)
         # Add more business functions as needed:
         # llm.register_function("create_walkin_booking", handlers.create_walkin_booking)
 
